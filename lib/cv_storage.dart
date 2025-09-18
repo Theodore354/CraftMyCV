@@ -1,31 +1,45 @@
+// lib/cv_storage.dart
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class CvStorage {
-  static const _key = 'saved_cvs';
-  static List<String> savedCvs = [];
+  static const String _prefsKey = 'saved_cvs';
 
-  static Future<void> init() async {
+  /// ValueNotifier so UI can react to changes automatically
+  static final ValueNotifier<List<String>> savedCvs =
+      ValueNotifier<List<String>>([]);
+
+  /// Load saved CVs from SharedPreferences (call once at app startup)
+  static Future<void> load() async {
     final prefs = await SharedPreferences.getInstance();
-    savedCvs = prefs.getStringList(_key) ?? [];
+    final stored = prefs.getStringList(_prefsKey) ?? <String>[];
+    savedCvs.value = stored;
   }
 
+  /// Persist current list to SharedPreferences
+  static Future<void> _save() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList(_prefsKey, savedCvs.value);
+  }
+
+  /// Add a CV (updates ValueNotifier and persists)
   static Future<void> add(String cv) async {
-    savedCvs.add(cv);
-    await _saveAll();
+    savedCvs.value = List<String>.from(savedCvs.value)..add(cv);
+    await _save();
   }
 
-  static Future<void> removeAt(int index) async {
-    savedCvs.removeAt(index);
-    await _saveAll();
+  /// Delete CV by index (updates ValueNotifier and persists)
+  static Future<void> delete(int index) async {
+    if (index < 0 || index >= savedCvs.value.length) return;
+    final updated = List<String>.from(savedCvs.value)..removeAt(index);
+    savedCvs.value = updated;
+    await _save();
   }
 
+  /// Clear all CVs (updates ValueNotifier and removes the key)
   static Future<void> clear() async {
-    savedCvs.clear();
-    await _saveAll();
-  }
-
-  static Future<void> _saveAll() async {
+    savedCvs.value = [];
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setStringList(_key, savedCvs);
+    await prefs.remove(_prefsKey);
   }
 }

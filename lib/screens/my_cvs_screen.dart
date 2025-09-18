@@ -1,98 +1,140 @@
+// lib/screens/my_cvs_screen.dart
 import 'package:flutter/material.dart';
-import 'results_screen.dart';
 import '../cv_storage.dart';
+import 'results_screen.dart';
 
-class MyCvsScreen extends StatefulWidget {
+class MyCvsScreen extends StatelessWidget {
   const MyCvsScreen({super.key});
 
-  @override
-  State<MyCvsScreen> createState() => _MyCvsScreenState();
-}
+  Future<void> _deleteCv(BuildContext context, int index) async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder:
+          (ctx) => AlertDialog(
+            title: const Text("Delete CV?"),
+            content: const Text("Are you sure you want to delete this CV?"),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, false),
+                child: const Text("Cancel"),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.pop(ctx, true),
+                child: const Text("Delete"),
+              ),
+            ],
+          ),
+    );
 
-class _MyCvsScreenState extends State<MyCvsScreen> {
+    if (confirm == true) {
+      await CvStorage.delete(index);
+      if (context.mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('CV deleted')));
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final savedCvs = CvStorage.savedCvs;
-
     return Scaffold(
-      appBar: AppBar(title: const Text("My CVs")),
-      body:
-          savedCvs.isEmpty
-              ? const Center(
-                child: Text("No CVs saved yet", style: TextStyle(fontSize: 16)),
-              )
-              : ListView.builder(
-                itemCount: savedCvs.length,
-                itemBuilder: (context, index) {
-                  final preview = savedCvs[index];
-                  return Dismissible(
-                    key: ValueKey(preview.hashCode ^ index),
-                    direction: DismissDirection.endToStart,
-                    background: Container(
-                      alignment: Alignment.centerRight,
-                      padding: const EdgeInsets.symmetric(horizontal: 20),
-                      color: Colors.red,
-                      child: const Icon(Icons.delete, color: Colors.white),
-                    ),
-                    confirmDismiss: (_) async {
-                      return await showDialog<bool>(
-                            context: context,
-                            builder:
-                                (_) => AlertDialog(
-                                  title: const Text('Delete CV?'),
-                                  content: const Text(
-                                    'This action cannot be undone.',
-                                  ),
-                                  actions: [
-                                    TextButton(
-                                      onPressed:
-                                          () => Navigator.pop(context, false),
-                                      child: const Text('Cancel'),
-                                    ),
-                                    FilledButton(
-                                      onPressed:
-                                          () => Navigator.pop(context, true),
-                                      child: const Text('Delete'),
-                                    ),
-                                  ],
-                                ),
-                          ) ??
-                          false;
-                    },
-                    onDismissed: (_) async {
-                      await CvStorage.removeAt(index);
-                      if (mounted) setState(() {});
-                    },
-                    child: Card(
-                      margin: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 6,
+      appBar: AppBar(
+        title: const Text("My CVs"),
+        centerTitle: true,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.delete_forever),
+            tooltip: "Clear All",
+            onPressed: () async {
+              final confirm = await showDialog<bool>(
+                context: context,
+                builder:
+                    (ctx) => AlertDialog(
+                      title: const Text("Clear All CVs?"),
+                      content: const Text(
+                        "This will permanently delete all saved CVs.",
                       ),
-                      child: ListTile(
-                        title: Text("CV ${index + 1}"),
-                        subtitle: Text(
-                          preview.substring(
-                            0,
-                            preview.length > 80 ? 80 : preview.length,
-                          ),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(ctx, false),
+                          child: const Text("Cancel"),
                         ),
-                        trailing: const Icon(Icons.arrow_forward_ios),
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder:
-                                  (_) => ResultsScreen(resultText: preview),
-                            ),
-                          );
-                        },
-                      ),
+                        ElevatedButton(
+                          onPressed: () => Navigator.pop(ctx, true),
+                          child: const Text("Delete All"),
+                        ),
+                      ],
                     ),
+              );
+
+              if (confirm == true) {
+                await CvStorage.clear();
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text("All CVs cleared")),
                   );
-                },
+                }
+              }
+            },
+          ),
+        ],
+      ),
+      body: ValueListenableBuilder<List<String>>(
+        valueListenable: CvStorage.savedCvs,
+        builder: (context, cvs, _) {
+          if (cvs.isEmpty) {
+            return const Center(
+              child: Text(
+                "No CVs saved yet.\nGo create one!",
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 16, color: Colors.grey),
               ),
+            );
+          }
+
+          return ListView.builder(
+            padding: const EdgeInsets.all(12),
+            itemCount: cvs.length,
+            itemBuilder: (context, index) {
+              final preview = cvs[index].split("\n").first;
+              return Card(
+                elevation: 3,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                margin: const EdgeInsets.symmetric(vertical: 8),
+                child: ListTile(
+                  contentPadding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
+                  title: Text(
+                    preview.isNotEmpty ? preview : "Untitled CV",
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  subtitle: const Text("Tap to view full CV"),
+                  trailing: IconButton(
+                    icon: const Icon(Icons.delete, color: Colors.red),
+                    onPressed: () => _deleteCv(context, index),
+                  ),
+                  onTap: () {
+                    // 🚀 Open ResultsScreen instead of dialog
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => ResultsScreen(resultText: cvs[index]),
+                      ),
+                    );
+                  },
+                ),
+              );
+            },
+          );
+        },
+      ),
     );
   }
 }

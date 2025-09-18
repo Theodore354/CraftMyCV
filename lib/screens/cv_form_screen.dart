@@ -1,3 +1,4 @@
+// lib/screens/cv_form_screen.dart
 import 'package:flutter/material.dart';
 import 'results_screen.dart';
 
@@ -9,6 +10,8 @@ class CvFormScreen extends StatefulWidget {
 }
 
 class _CvFormScreenState extends State<CvFormScreen> {
+  final _formKey = GlobalKey<FormState>();
+
   // Controllers
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
@@ -28,48 +31,22 @@ class _CvFormScreenState extends State<CvFormScreen> {
 
   final _skillsController = TextEditingController();
 
-  @override
-  void dispose() {
-    _nameController.dispose();
-    _emailController.dispose();
-    _phoneController.dispose();
-    _locationController.dispose();
-    _jobTitleController.dispose();
-    _companyController.dispose();
-    _jobStartDateController.dispose();
-    _jobEndDateController.dispose();
-    _responsibilitiesController.dispose();
-    _degreeController.dispose();
-    _institutionController.dispose();
-    _eduStartDateController.dispose();
-    _eduEndDateController.dispose();
-    _skillsController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _pickDate(TextEditingController controller) async {
-    final now = DateTime.now();
-    final picked = await showDatePicker(
+  // Pick date helper
+  Future<void> _pickDate(TextEditingController controller, String label) async {
+    DateTime? picked = await showDatePicker(
       context: context,
-      firstDate: DateTime(1970),
-      lastDate: DateTime(now.year + 5),
-      initialDate: now,
+      initialDate: DateTime.now(),
+      firstDate: DateTime(1980),
+      lastDate: DateTime(2100),
     );
+
     if (picked != null) {
-      controller.text =
-          "${picked.year}-${picked.month.toString().padLeft(2, '0')}-${picked.day.toString().padLeft(2, '0')}";
+      controller.text = "${picked.day}/${picked.month}/${picked.year}";
     }
   }
 
   void _generateCV() {
-    if (_nameController.text.isEmpty ||
-        _emailController.text.isEmpty ||
-        _phoneController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Please fill in required fields")),
-      );
-      return;
-    }
+    if (!_formKey.currentState!.validate()) return;
 
     final dummyCV = """
 Name: ${_nameController.text}
@@ -93,44 +70,39 @@ Skills: ${_skillsController.text}
 (This is a sample CV, later we’ll replace this with AI-generated content.)
 """;
 
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => ResultsScreen(resultText: dummyCV)),
-    );
+    if (mounted) {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => ResultsScreen(resultText: dummyCV)),
+      );
+    }
   }
 
   Widget _buildField({
     required String label,
     required TextEditingController controller,
+    String? Function(String?)? validator,
     int maxLines = 1,
-    TextInputType? keyboardType,
-    TextInputAction? textInputAction,
+    bool readOnly = false,
+    VoidCallback? onTap,
   }) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 8.0),
-      child: TextField(
+      child: TextFormField(
         controller: controller,
         maxLines: maxLines,
-        keyboardType: keyboardType,
-        textInputAction: textInputAction,
+        readOnly: readOnly,
+        onTap: onTap,
+        validator: validator,
         decoration: InputDecoration(
           labelText: label,
           filled: true,
-          fillColor: Colors.grey.shade100,
+          fillColor: Colors.grey.shade200,
           border: OutlineInputBorder(
             borderRadius: BorderRadius.circular(12),
             borderSide: BorderSide.none,
           ),
         ),
-      ),
-    );
-  }
-
-  Widget _dateField(String label, TextEditingController controller) {
-    return InkWell(
-      onTap: () => _pickDate(controller),
-      child: IgnorePointer(
-        child: _buildField(label: label, controller: controller),
       ),
     );
   }
@@ -141,105 +113,212 @@ Skills: ${_skillsController.text}
       appBar: AppBar(title: const Text("Create CV"), centerTitle: true),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Text(
-              "Personal Details",
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-            ),
-            _buildField(
-              label: "Full Name",
-              controller: _nameController,
-              textInputAction: TextInputAction.next,
-            ),
-            _buildField(
-              label: "Email",
-              controller: _emailController,
-              keyboardType: TextInputType.emailAddress,
-              textInputAction: TextInputAction.next,
-            ),
-            _buildField(
-              label: "Phone Number",
-              controller: _phoneController,
-              keyboardType: TextInputType.phone,
-              textInputAction: TextInputAction.next,
-            ),
-            _buildField(
-              label: "Location",
-              controller: _locationController,
-              textInputAction: TextInputAction.next,
-            ),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                "Personal Details",
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
+              _buildField(
+                label: "Full Name",
+                controller: _nameController,
+                validator:
+                    (val) =>
+                        val == null || val.isEmpty ? "Name is required" : null,
+              ),
+              _buildField(
+                label: "Email",
+                controller: _emailController,
+                validator: (val) {
+                  if (val == null || val.isEmpty) return "Email is required";
+                  if (!RegExp(
+                    r'^[\w-.]+@([\w-]+\.)+[\w-]{2,4}$',
+                  ).hasMatch(val)) {
+                    return "Enter a valid email";
+                  }
+                  return null;
+                },
+              ),
+              _buildField(
+                label: "Phone Number",
+                controller: _phoneController,
+                validator: (val) {
+                  if (val == null || val.isEmpty) {
+                    return "Phone number is required";
+                  }
+                  if (!RegExp(r'^\d{7,15}$').hasMatch(val)) {
+                    return "Enter a valid phone number";
+                  }
+                  return null;
+                },
+              ),
+              _buildField(
+                label: "Location",
+                controller: _locationController,
+                validator:
+                    (val) =>
+                        val == null || val.isEmpty
+                            ? "Location is required"
+                            : null,
+              ),
 
-            const SizedBox(height: 16),
-            const Text(
-              "Work Experience",
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-            ),
-            _buildField(
-              label: "Job Title",
-              controller: _jobTitleController,
-              textInputAction: TextInputAction.next,
-            ),
-            _buildField(
-              label: "Company",
-              controller: _companyController,
-              textInputAction: TextInputAction.next,
-            ),
-            Row(
-              children: [
-                Expanded(
-                  child: _dateField("Start Date", _jobStartDateController),
-                ),
-                const SizedBox(width: 10),
-                Expanded(child: _dateField("End Date", _jobEndDateController)),
-              ],
-            ),
-            _buildField(
-              label: "Responsibilities",
-              controller: _responsibilitiesController,
-              maxLines: 3,
-            ),
+              const SizedBox(height: 16),
+              const Text(
+                "Work Experience",
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
+              _buildField(
+                label: "Job Title",
+                controller: _jobTitleController,
+                validator:
+                    (val) =>
+                        val == null || val.isEmpty
+                            ? "Job title is required"
+                            : null,
+              ),
+              _buildField(
+                label: "Company",
+                controller: _companyController,
+                validator:
+                    (val) =>
+                        val == null || val.isEmpty
+                            ? "Company is required"
+                            : null,
+              ),
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildField(
+                      label: "Start Date",
+                      controller: _jobStartDateController,
+                      readOnly: true,
+                      onTap:
+                          () =>
+                              _pickDate(_jobStartDateController, "Start Date"),
+                      validator:
+                          (val) =>
+                              val == null || val.isEmpty
+                                  ? "Start date required"
+                                  : null,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: _buildField(
+                      label: "End Date",
+                      controller: _jobEndDateController,
+                      readOnly: true,
+                      onTap: () => _pickDate(_jobEndDateController, "End Date"),
+                      validator:
+                          (val) =>
+                              val == null || val.isEmpty
+                                  ? "End date required"
+                                  : null,
+                    ),
+                  ),
+                ],
+              ),
+              _buildField(
+                label: "Responsibilities",
+                controller: _responsibilitiesController,
+                maxLines: 3,
+              ),
 
-            const SizedBox(height: 16),
-            const Text(
-              "Education",
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-            ),
-            _buildField(label: "Degree", controller: _degreeController),
-            _buildField(
-              label: "Institution",
-              controller: _institutionController,
-            ),
-            Row(
-              children: [
-                Expanded(
-                  child: _dateField("Start Date", _eduStartDateController),
-                ),
-                const SizedBox(width: 10),
-                Expanded(child: _dateField("End Date", _eduEndDateController)),
-              ],
-            ),
+              const SizedBox(height: 16),
+              const Text(
+                "Education",
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
+              _buildField(
+                label: "Degree",
+                controller: _degreeController,
+                validator:
+                    (val) =>
+                        val == null || val.isEmpty
+                            ? "Degree is required"
+                            : null,
+              ),
+              _buildField(
+                label: "Institution",
+                controller: _institutionController,
+                validator:
+                    (val) =>
+                        val == null || val.isEmpty
+                            ? "Institution is required"
+                            : null,
+              ),
+              Row(
+                children: [
+                  Expanded(
+                    child: _buildField(
+                      label: "Start Date",
+                      controller: _eduStartDateController,
+                      readOnly: true,
+                      onTap:
+                          () =>
+                              _pickDate(_eduStartDateController, "Start Date"),
+                      validator:
+                          (val) =>
+                              val == null || val.isEmpty
+                                  ? "Start date required"
+                                  : null,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: _buildField(
+                      label: "End Date",
+                      controller: _eduEndDateController,
+                      readOnly: true,
+                      onTap: () => _pickDate(_eduEndDateController, "End Date"),
+                      validator:
+                          (val) =>
+                              val == null || val.isEmpty
+                                  ? "End date required"
+                                  : null,
+                    ),
+                  ),
+                ],
+              ),
 
-            const SizedBox(height: 16),
-            const Text(
-              "Skills",
-              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-            ),
-            _buildField(label: "Add Skills", controller: _skillsController),
+              const SizedBox(height: 16),
+              const Text(
+                "Skills",
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+              ),
+              _buildField(
+                label: "Add Skills",
+                controller: _skillsController,
+                validator:
+                    (val) =>
+                        val == null || val.isEmpty
+                            ? "At least 1 skill required"
+                            : null,
+              ),
 
-            const SizedBox(height: 24),
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton(
-                onPressed: _generateCV,
-                child: const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 14),
-                  child: Text("Next", style: TextStyle(fontSize: 16)),
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  onPressed: _generateCV,
+                  child: const Text(
+                    "Next",
+                    style: TextStyle(color: Colors.white, fontSize: 16),
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

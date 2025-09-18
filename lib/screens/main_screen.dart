@@ -1,3 +1,4 @@
+// lib/screens/main_screen.dart
 import 'package:flutter/material.dart';
 import 'home_screen.dart';
 import 'my_cvs_screen.dart';
@@ -16,7 +17,7 @@ class _MainScreenState extends State<MainScreen> {
   // Screens for each tab
   final List<Widget> _screens = const [
     HomeScreen(),
-    MyCvsScreen(), // ✅ No parameter anymore
+    MyCvsScreen(),
     TemplatesScreen(),
   ];
 
