@@ -1,4 +1,5 @@
-package com.example.cv_helper_app
+package com.theodore.craftmycv
+
 
 import io.flutter.embedding.android.FlutterActivity
 

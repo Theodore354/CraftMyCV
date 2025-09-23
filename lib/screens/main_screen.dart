@@ -1,18 +1,24 @@
-// lib/screens/main_screen.dart
 import 'package:flutter/material.dart';
 import 'home_screen.dart';
 import 'my_cvs_screen.dart';
 import 'templates_screen.dart';
 
 class MainScreen extends StatefulWidget {
-  const MainScreen({super.key});
+  const MainScreen({super.key, this.initialIndex = 0});
+  final int initialIndex;
 
   @override
   State<MainScreen> createState() => _MainScreenState();
 }
 
 class _MainScreenState extends State<MainScreen> {
-  int _selectedIndex = 0;
+  late int _selectedIndex;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedIndex = widget.initialIndex;
+  }
 
   // Screens for each tab
   final List<Widget> _screens = const [

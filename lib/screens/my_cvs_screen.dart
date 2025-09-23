@@ -1,6 +1,5 @@
-// lib/screens/my_cvs_screen.dart
+import 'package:cv_helper_app/cv_storage.dart';
 import 'package:flutter/material.dart';
-import '../cv_storage.dart';
 import 'results_screen.dart';
 
 class MyCvsScreen extends StatelessWidget {

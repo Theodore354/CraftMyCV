@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "209781212694",
+    "project_id": "cv-helper-app",
+    "storage_bucket": "cv-helper-app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:209781212694:android:8a4539a756cbc547001737",
+        "android_client_info": {
+          "package_name": "com.theodore.craftmycv"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBB3BWGWbC5_BddJ7C7xPlUD9QgKv99q-E"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,9 +1,10 @@
-// lib/screens/results_screen.dart
+import 'package:cv_helper_app/cv_storage.dart';
 import 'package:cv_helper_app/services/pdf_service.dart';
 import 'package:flutter/material.dart';
-import '../cv_storage.dart';
-import 'my_cvs_screen.dart';
+import 'package:flutter/services.dart';
 
+
+import 'main_screen.dart';
 
 class ResultsScreen extends StatelessWidget {
   final String resultText;
@@ -36,26 +37,52 @@ class ResultsScreen extends StatelessWidget {
       await CvStorage.add(resultText);
     }
 
-    if (context.mounted) {
-      Navigator.pushReplacement(
+    if (!context.mounted) return;
+
+    // Replace stack and show MainScreen with "My CVs" tab selected
+    Navigator.of(context).pushAndRemoveUntil(
+      MaterialPageRoute(builder: (_) => const MainScreen(initialIndex: 1)),
+      (route) => false,
+    );
+  }
+
+  Future<void> _copyToClipboard(BuildContext context) async {
+    if (resultText.isEmpty) {
+      ScaffoldMessenger.of(
         context,
-        MaterialPageRoute(builder: (_) => const MyCvsScreen()),
-      );
+      ).showSnackBar(const SnackBar(content: Text('Nothing to copy.')));
+      return;
+    }
+    await Clipboard.setData(ClipboardData(text: resultText));
+    if (context.mounted) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Copied to clipboard')));
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final hasText = resultText.isNotEmpty;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('CV Result'),
         centerTitle: true,
         actions: [
           IconButton(
+            tooltip: 'Copy',
+            icon: const Icon(Icons.copy_outlined),
+            onPressed: hasText ? () => _copyToClipboard(context) : null,
+          ),
+          IconButton(
             tooltip: 'Home',
             icon: const Icon(Icons.home_outlined),
             onPressed: () {
-              Navigator.popUntil(context, (route) => route.isFirst);
+              Navigator.of(context).pushAndRemoveUntil(
+                MaterialPageRoute(builder: (_) => const MainScreen()),
+                (route) => false,
+              );
             },
           ),
         ],
@@ -64,7 +91,7 @@ class ResultsScreen extends StatelessWidget {
         padding: const EdgeInsets.all(16.0),
         child: SingleChildScrollView(
           child: SelectableText(
-            resultText.isNotEmpty
+            hasText
                 ? resultText
                 : "⚠️ No CV generated. Please create one first.",
             style: const TextStyle(fontSize: 16),
@@ -73,39 +100,23 @@ class ResultsScreen extends StatelessWidget {
       ),
       bottomNavigationBar: Padding(
         padding: const EdgeInsets.all(12.0),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
+        child: Row(
           children: [
-            // Full-width Save button
-            SizedBox(
-              width: double.infinity,
-              child: FilledButton.icon(
-                onPressed: () => _saveCv(context),
-                icon: const Icon(Icons.save),
-                label: const Text('Save'),
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed: () => _saveAndGoToMyCvs(context),
+                icon: const Icon(Icons.folder_open),
+                label: const Text(' View My CVs'),
               ),
             ),
-            const SizedBox(height: 10),
-
-            // Row with two secondary buttons
-            Row(
-              children: [
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () => _saveAndGoToMyCvs(context),
-                    icon: const Icon(Icons.folder_open),
-                    label: const Text('Save & View My CVs'),
-                  ),
-                ),
-                const SizedBox(width: 10),
-                Expanded(
-                  child: OutlinedButton.icon(
-                    onPressed: () => PdfService.previewPdf(resultText),
-                    icon: const Icon(Icons.picture_as_pdf),
-                    label: const Text('Export PDF'),
-                  ),
-                ),
-              ],
+            const SizedBox(width: 10),
+            Expanded(
+              child: OutlinedButton.icon(
+                onPressed:
+                    hasText ? () => PdfService.previewPdf(resultText) : null,
+                icon: const Icon(Icons.picture_as_pdf),
+                label: const Text('Export PDF'),
+              ),
             ),
           ],
         ),

@@ -1,4 +1,4 @@
-// lib/screens/cv_polisher_screen.dart
+
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:dotted_border/dotted_border.dart';
@@ -114,7 +114,6 @@ Sample reworded summary:
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     // Blue that matches the screenshot button
-    const primaryBlue = Color(0xFF0A84FF);
 
     return Scaffold(
       appBar: AppBar(

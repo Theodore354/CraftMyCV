@@ -1,4 +1,5 @@
 import 'dart:typed_data';
+// ignore: depend_on_referenced_packages
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 
@@ -12,7 +13,7 @@ class PdfService {
         build:
             (pw.Context context) => pw.Padding(
               padding: const pw.EdgeInsets.all(24),
-              child: pw.Text(cvText, style: pw.TextStyle(fontSize: 14)),
+              child: pw.Text(cvText, style: const pw.TextStyle(fontSize: 14)),
             ),
       ),
     );
