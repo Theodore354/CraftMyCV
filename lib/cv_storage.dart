@@ -1,4 +1,4 @@
-
+// lib/cv_storage.dart
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -25,6 +25,14 @@ class CvStorage {
   /// Add a CV (updates ValueNotifier and persists)
   static Future<void> add(String cv) async {
     savedCvs.value = List<String>.from(savedCvs.value)..add(cv);
+    await _save();
+  }
+
+  /// Update an existing CV (by index)
+  static Future<void> update(int index, String cv) async {
+    if (index < 0 || index >= savedCvs.value.length) return;
+    final updated = List<String>.from(savedCvs.value)..[index] = cv;
+    savedCvs.value = updated;
     await _save();
   }
 

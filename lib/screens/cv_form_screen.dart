@@ -1,10 +1,19 @@
-
+import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
-import 'results_screen.dart';
+import 'package:cv_helper_app/cv_storage.dart';
+import 'package:cv_helper_app/models/index.dart';
+import 'cv_preview_screen.dart';
 
 class CvFormScreen extends StatefulWidget {
-  const CvFormScreen({super.key});
+  /// If editing, pass the existing CV and its index in CvStorage
+  final CvModel? initial;
+  final int? storageIndex;
+
+  const CvFormScreen({super.key, this.initial, this.storageIndex})
+    : assert(
+        (initial == null && storageIndex == null) ||
+            (initial != null && storageIndex != null),
+      );
 
   @override
   State<CvFormScreen> createState() => _CvFormScreenState();
@@ -13,500 +22,395 @@ class CvFormScreen extends StatefulWidget {
 class _CvFormScreenState extends State<CvFormScreen> {
   final _formKey = GlobalKey<FormState>();
 
-  // Controllers — Personal
-  final _nameController = TextEditingController();
+  // Basic info
+  final _fullNameController = TextEditingController();
   final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
   final _locationController = TextEditingController();
 
-  // Controllers — Work
-  final _jobTitleController = TextEditingController();
-  final _companyController = TextEditingController();
-  final _jobStartDateController = TextEditingController();
-  final _jobEndDateController = TextEditingController();
-  final _responsibilitiesController = TextEditingController();
-
-  // Controllers — Education
-  final _degreeController = TextEditingController();
-  final _institutionController = TextEditingController();
-  final _eduStartDateController = TextEditingController();
-  final _eduEndDateController = TextEditingController();
-
-  // Controllers — Skills
+  // Skills (comma separated)
   final _skillsController = TextEditingController();
 
-  // Toggles for "Present"
-  bool _isCurrentJob = false;
-  bool _isCurrentEdu = false;
+  // Dynamic lists
+  final List<WorkEntry> _workEntries = [];
+  final List<EducationEntry> _educationEntries = [];
 
-  // ===== Helpers (trim & normalize) ==========================================
-  String _t(TextEditingController c) => c.text.trim();
+  bool get _isEditing => widget.initial != null;
 
-  String _normalizeSpaces(String s) {
-    // Collapse extra spaces/newlines.
-    final t = s
-        .replaceAll(RegExp(r'[ \t]+\n'), '\n')
-        .replaceAll(RegExp(r'\n{3,}'), '\n\n');
-    return t.trim();
-  }
-
-  String _normalizeCommaList(String s) {
-    // Split by comma/semicolon/newline and re-join with a clean ", "
-    final parts =
-        s
-            .split(RegExp(r'[,\n;]'))
-            .map((e) => e.trim())
-            .where((e) => e.isNotEmpty)
-            .toList();
-    return parts.join(', ');
-  }
-
-  // Month names for MMM formatting (no extra deps)
-  static const List<String> _mmm = [
-    'Jan',
-    'Feb',
-    'Mar',
-    'Apr',
-    'May',
-    'Jun',
-    'Jul',
-    'Aug',
-    'Sep',
-    'Oct',
-    'Nov',
-    'Dec',
-  ];
-  String _formatMonthYear(DateTime d) => '${_mmm[d.month - 1]} ${d.year}';
-
-  // Pick date helper -> stores as "MMM yyyy"
-  Future<void> _pickDate(TextEditingController controller, String label) async {
-    final picked = await showDatePicker(
-      context: context,
-      initialDate: DateTime.now(),
-      firstDate: DateTime(1980),
-      lastDate: DateTime(2100),
-      helpText: label, // header label
-    );
-    if (picked != null) {
-      controller.text = _formatMonthYear(picked);
+  @override
+  void initState() {
+    super.initState();
+    if (_isEditing) {
+      final cv = widget.initial!;
+      _fullNameController.text = cv.fullName;
+      _emailController.text = cv.email;
+      _phoneController.text = cv.phone;
+      _locationController.text = cv.location;
+      _skillsController.text = cv.skills.join(', ');
+      _workEntries.addAll(cv.workExperience);
+      _educationEntries.addAll(cv.education);
     }
-  }
-
-  void _generateCV() {
-    // Close keyboard first for better UX
-    FocusScope.of(context).unfocus();
-
-    if (!_formKey.currentState!.validate()) return;
-
-    // normalized values
-    final name = _t(_nameController);
-    final email = _t(_emailController).toLowerCase();
-    final phone = _t(_phoneController);
-    final location = _t(_locationController);
-
-    final jobTitle = _t(_jobTitleController);
-    final company = _t(_companyController);
-    final jobStart = _t(_jobStartDateController);
-    final jobEnd = _isCurrentJob ? "Present" : _t(_jobEndDateController);
-    final responsibilities = _normalizeSpaces(_t(_responsibilitiesController));
-
-    final degree = _t(_degreeController);
-    final institution = _t(_institutionController);
-    final eduStart = _t(_eduStartDateController);
-    final eduEnd = _isCurrentEdu ? "Present" : _t(_eduEndDateController);
-
-    final skills = _normalizeCommaList(_t(_skillsController));
-
-    final dummyCV = """
-Name: $name
-Email: $email
-Phone: $phone
-Location: $location
-
-Work Experience
-Job Title: $jobTitle
-Company: $company
-Start: $jobStart - End: $jobEnd
-Responsibilities: $responsibilities
-
-Education
-Degree: $degree
-Institution: $institution
-Start: $eduStart - End: $eduEnd
-
-Skills: $skills
-
-(This is a sample CV, later we’ll replace this with AI-generated content.)
-""";
-
-    if (mounted) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(builder: (_) => ResultsScreen(resultText: dummyCV)),
-      );
-    }
-  }
-
-  // Reusable field builder with better keyboard/autofill ergonomics
-  Widget _buildField({
-    required String label,
-    required TextEditingController controller,
-    String? Function(String?)? validator,
-    int maxLines = 1,
-    bool readOnly = false,
-    bool enabled = true,
-    VoidCallback? onTap,
-    TextInputType? keyboardType,
-    TextInputAction? textInputAction,
-    Iterable<String>? autofillHints,
-    List<TextInputFormatter>? inputFormatters,
-    TextCapitalization textCapitalization = TextCapitalization.none,
-    String? hintText,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
-      child: TextFormField(
-        controller: controller,
-        maxLines: maxLines,
-        readOnly: readOnly,
-        enabled: enabled,
-        onTap: onTap,
-        validator: validator,
-        keyboardType: keyboardType,
-        textInputAction: textInputAction,
-        autofillHints: autofillHints,
-        inputFormatters: inputFormatters,
-        textCapitalization: textCapitalization,
-        decoration: InputDecoration(
-          labelText: label,
-          hintText: hintText,
-          filled: true,
-          fillColor: Colors.grey.shade200,
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide.none,
-          ),
-        ),
-      ),
-    );
   }
 
   @override
   void dispose() {
-    _nameController.dispose();
+    _fullNameController.dispose();
     _emailController.dispose();
     _phoneController.dispose();
     _locationController.dispose();
-
-    _jobTitleController.dispose();
-    _companyController.dispose();
-    _jobStartDateController.dispose();
-    _jobEndDateController.dispose();
-    _responsibilitiesController.dispose();
-
-    _degreeController.dispose();
-    _institutionController.dispose();
-    _eduStartDateController.dispose();
-    _eduEndDateController.dispose();
-
     _skillsController.dispose();
     super.dispose();
+  }
+
+  // ====== Add Work Entry ======
+  void _addWorkEntry() {
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        final jobController = TextEditingController();
+        final companyController = TextEditingController();
+        final startController = TextEditingController();
+        final endController = TextEditingController();
+        final respController = TextEditingController();
+
+        return AlertDialog(
+          title: const Text("Add Work Experience"),
+          content: SingleChildScrollView(
+            child: Column(
+              children: [
+                TextField(
+                  controller: jobController,
+                  decoration: const InputDecoration(labelText: "Job Title"),
+                ),
+                TextField(
+                  controller: companyController,
+                  decoration: const InputDecoration(labelText: "Company"),
+                ),
+                TextField(
+                  controller: startController,
+                  decoration: const InputDecoration(
+                    labelText: "Start (e.g. Jan 2020)",
+                  ),
+                ),
+                TextField(
+                  controller: endController,
+                  decoration: const InputDecoration(
+                    labelText: "End (e.g. Dec 2022 / Present)",
+                  ),
+                ),
+                TextField(
+                  controller: respController,
+                  decoration: const InputDecoration(
+                    labelText: "Responsibilities",
+                  ),
+                  maxLines: 3,
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text("Cancel"),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                setState(() {
+                  _workEntries.add(
+                    WorkEntry(
+                      jobTitle: jobController.text.trim(),
+                      company: companyController.text.trim(),
+                      start: startController.text.trim(),
+                      end: endController.text.trim(),
+                      responsibilities:
+                          respController.text.trim().isEmpty
+                              ? null
+                              : respController.text.trim(),
+                    ),
+                  );
+                });
+                Navigator.pop(ctx);
+              },
+              child: const Text("Add"),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // ====== Add Education Entry ======
+  void _addEducationEntry() {
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        final degreeController = TextEditingController();
+        final institutionController = TextEditingController();
+        final startController = TextEditingController();
+        final endController = TextEditingController();
+        final descController = TextEditingController();
+
+        return AlertDialog(
+          title: const Text("Add Education"),
+          content: SingleChildScrollView(
+            child: Column(
+              children: [
+                TextField(
+                  controller: degreeController,
+                  decoration: const InputDecoration(labelText: "Degree"),
+                ),
+                TextField(
+                  controller: institutionController,
+                  decoration: const InputDecoration(labelText: "Institution"),
+                ),
+                TextField(
+                  controller: startController,
+                  decoration: const InputDecoration(
+                    labelText: "Start (e.g. Sep 2016)",
+                  ),
+                ),
+                TextField(
+                  controller: endController,
+                  decoration: const InputDecoration(
+                    labelText: "End (e.g. Jun 2020 / Present)",
+                  ),
+                ),
+                TextField(
+                  controller: descController,
+                  decoration: const InputDecoration(labelText: "Description"),
+                  maxLines: 3,
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(ctx),
+              child: const Text("Cancel"),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                setState(() {
+                  _educationEntries.add(
+                    EducationEntry(
+                      degree: degreeController.text.trim(),
+                      institution: institutionController.text.trim(),
+                      start: startController.text.trim(),
+                      end: endController.text.trim(),
+                      description:
+                          descController.text.trim().isEmpty
+                              ? null
+                              : descController.text.trim(),
+                    ),
+                  );
+                });
+                Navigator.pop(ctx);
+              },
+              child: const Text("Add"),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  String _newId() => DateTime.now().microsecondsSinceEpoch.toString();
+
+  // ====== Next -> Preview -> Confirm & Save/Update ======
+  Future<void> _onNext() async {
+    if (!(_formKey.currentState?.validate() ?? false)) return;
+
+    final skills =
+        _skillsController.text
+            .split(',')
+            .map((s) => s.trim())
+            .where((s) => s.isNotEmpty)
+            .toList();
+
+    final now = DateTime.now().millisecondsSinceEpoch;
+
+    final base = CvModel(
+      id: _isEditing ? widget.initial!.id : _newId(),
+      fullName: _fullNameController.text.trim(),
+      email: _emailController.text.trim(),
+      phone: _phoneController.text.trim(),
+      location: _locationController.text.trim(),
+      workExperience: List<WorkEntry>.from(_workEntries),
+      education: List<EducationEntry>.from(_educationEntries),
+      skills: skills,
+      createdAt: _isEditing ? (widget.initial!.createdAt ?? now) : now,
+      updatedAt: now,
+    );
+
+    // 1) Preview
+    final confirmed = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (_) => CvPreviewScreen(cv: base),
+        fullscreenDialog: true,
+      ),
+    );
+
+    // 2) Persist only if confirmed
+    if (confirmed == true) {
+      final jsonStr = jsonEncode(base.toJson());
+
+      if (_isEditing) {
+        await CvStorage.update(widget.storageIndex!, jsonStr);
+      } else {
+        await CvStorage.add(jsonStr);
+      }
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(_isEditing ? 'CV updated' : 'CV saved')),
+      );
+
+      Navigator.of(context).pop(true);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text("Create CV"), centerTitle: true),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
+      appBar: AppBar(title: Text(_isEditing ? "Edit CV" : "Build Your CV")),
+      body: Padding(
+        padding: const EdgeInsets.all(16.0),
         child: Form(
           key: _formKey,
-          autovalidateMode: AutovalidateMode.onUserInteraction, // live feedback
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const Text(
-                "Personal Details",
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-              ),
-              _buildField(
-                label: "Full Name",
-                controller: _nameController,
-                textCapitalization: TextCapitalization.words,
-                textInputAction: TextInputAction.next,
-                autofillHints: const [AutofillHints.name],
-                validator:
-                    (val) =>
-                        val == null || val.trim().isEmpty
-                            ? "Name is required"
-                            : null,
-              ),
-              _buildField(
-                label: "Email",
-                controller: _emailController,
-                keyboardType: TextInputType.emailAddress,
-                textInputAction: TextInputAction.next,
-                autofillHints: const [AutofillHints.email],
-                validator: (val) {
-                  final v = val?.trim() ?? "";
-                  if (v.isEmpty) return "Email is required";
-                  final ok = RegExp(
-                    r'^[\w-.]+@([\w-]+\.)+[\w-]{2,4}$',
-                  ).hasMatch(v);
-                  return ok ? null : "Enter a valid email";
-                },
-              ),
-              _buildField(
-                label: "Phone Number",
-                controller: _phoneController,
-                keyboardType: TextInputType.phone,
-                textInputAction: TextInputAction.next,
-                autofillHints: const [AutofillHints.telephoneNumber],
-                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
-                validator: (val) {
-                  final v = val?.trim() ?? "";
-                  if (v.isEmpty) return "Phone number is required";
-                  final ok = RegExp(r'^\d{7,15}$').hasMatch(v);
-                  return ok ? null : "Enter a valid phone number (digits only)";
-                },
-              ),
-              _buildField(
-                label: "Location",
-                controller: _locationController,
-                textCapitalization: TextCapitalization.words,
-                textInputAction: TextInputAction.next,
-                autofillHints: const [AutofillHints.addressCityAndState],
-                validator:
-                    (val) =>
-                        val == null || val.trim().isEmpty
-                            ? "Location is required"
-                            : null,
-              ),
+          child: SingleChildScrollView(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Basic Info
+                TextFormField(
+                  controller: _fullNameController,
+                  decoration: const InputDecoration(labelText: "Full Name"),
+                  validator:
+                      (v) =>
+                          (v == null || v.trim().isEmpty)
+                              ? "Enter your name"
+                              : null,
+                ),
+                TextFormField(
+                  controller: _emailController,
+                  decoration: const InputDecoration(labelText: "Email"),
+                  keyboardType: TextInputType.emailAddress,
+                  validator: (v) {
+                    final value = v?.trim() ?? '';
+                    final ok = RegExp(r'^\S+@\S+\.\S+$').hasMatch(value);
+                    return ok ? null : 'Enter a valid email';
+                  },
+                ),
+                TextFormField(
+                  controller: _phoneController,
+                  decoration: const InputDecoration(labelText: "Phone"),
+                ),
+                TextFormField(
+                  controller: _locationController,
+                  decoration: const InputDecoration(labelText: "Location"),
+                ),
+                const SizedBox(height: 20),
 
-              const SizedBox(height: 16),
-              const Text(
-                "Work Experience",
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-              ),
-              _buildField(
-                label: "Job Title",
-                controller: _jobTitleController,
-                textCapitalization: TextCapitalization.sentences,
-                textInputAction: TextInputAction.next,
-                validator:
-                    (val) =>
-                        val == null || val.trim().isEmpty
-                            ? "Job title is required"
-                            : null,
-              ),
-              _buildField(
-                label: "Company",
-                controller: _companyController,
-                textCapitalization: TextCapitalization.words,
-                textInputAction: TextInputAction.next,
-                validator:
-                    (val) =>
-                        val == null || val.trim().isEmpty
-                            ? "Company is required"
-                            : null,
-              ),
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildField(
-                      label: "Start (MMM yyyy)",
-                      hintText: "e.g., Jan 2024",
-                      controller: _jobStartDateController,
-                      readOnly: true,
-                      textInputAction: TextInputAction.next,
-                      onTap:
-                          () => _pickDate(
-                            _jobStartDateController,
-                            "Start (Month & Year)",
-                          ),
-                      validator:
-                          (val) =>
-                              val == null || val.trim().isEmpty
-                                  ? "Start date required"
-                                  : null,
+                // Work Experience
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      "Work Experience",
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: _buildField(
-                      label: "End (MMM yyyy / Present)",
-                      hintText: "e.g., Jun 2025",
-                      controller: _jobEndDateController,
-                      readOnly: true,
-                      enabled: !_isCurrentJob, // show disabled style
-                      onTap:
-                          _isCurrentJob
-                              ? null
-                              : () => _pickDate(
-                                _jobEndDateController,
-                                "End (Month & Year)",
-                              ),
-                      validator: (val) {
-                        if (_isCurrentJob) return null; // Present is implied
-                        return (val == null || val.trim().isEmpty)
-                            ? "End date required"
-                            : null;
-                      },
+                    IconButton(
+                      icon: const Icon(Icons.add),
+                      onPressed: _addWorkEntry,
                     ),
-                  ),
-                ],
-              ),
-              // Toggle: I currently work here
-              CheckboxListTile(
-                contentPadding: EdgeInsets.zero,
-                title: const Text("I currently work here"),
-                value: _isCurrentJob,
-                onChanged: (v) {
-                  setState(() {
-                    _isCurrentJob = v ?? false;
-                    if (_isCurrentJob) {
-                      _jobEndDateController.text = "Present";
-                    } else {
-                      _jobEndDateController.clear();
-                    }
-                  });
-                },
-                controlAffinity: ListTileControlAffinity.leading,
-              ),
-              _buildField(
-                label: "Responsibilities",
-                controller: _responsibilitiesController,
-                maxLines: 3,
-                textCapitalization: TextCapitalization.sentences,
-              ),
-
-              const SizedBox(height: 16),
-              const Text(
-                "Education",
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-              ),
-              _buildField(
-                label: "Degree",
-                controller: _degreeController,
-                textCapitalization: TextCapitalization.words,
-                textInputAction: TextInputAction.next,
-                validator:
-                    (val) =>
-                        val == null || val.trim().isEmpty
-                            ? "Degree is required"
-                            : null,
-              ),
-              _buildField(
-                label: "Institution",
-                controller: _institutionController,
-                textCapitalization: TextCapitalization.words,
-                textInputAction: TextInputAction.next,
-                validator:
-                    (val) =>
-                        val == null || val.trim().isEmpty
-                            ? "Institution is required"
-                            : null,
-              ),
-              Row(
-                children: [
-                  Expanded(
-                    child: _buildField(
-                      label: "Start (MMM yyyy)",
-                      hintText: "e.g., Sep 2020",
-                      controller: _eduStartDateController,
-                      readOnly: true,
-                      textInputAction: TextInputAction.next,
-                      onTap:
-                          () => _pickDate(
-                            _eduStartDateController,
-                            "Start (Month & Year)",
-                          ),
-                      validator:
-                          (val) =>
-                              val == null || val.trim().isEmpty
-                                  ? "Start date required"
-                                  : null,
+                  ],
+                ),
+                ..._workEntries.map(
+                  (w) => Card(
+                    child: ListTile(
+                      title: Text("${w.jobTitle} at ${w.company}"),
+                      subtitle: Text(
+                        "${w.start} - ${w.end}\n${w.responsibilities ?? ''}",
+                      ),
+                      trailing: IconButton(
+                        icon: const Icon(Icons.delete, color: Colors.red),
+                        onPressed: () => setState(() => _workEntries.remove(w)),
+                      ),
                     ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: _buildField(
-                      label: "End (MMM yyyy / Present)",
-                      hintText: "e.g., Jun 2024",
-                      controller: _eduEndDateController,
-                      readOnly: true,
-                      enabled: !_isCurrentEdu,
-                      onTap:
-                          _isCurrentEdu
-                              ? null
-                              : () => _pickDate(
-                                _eduEndDateController,
-                                "End (Month & Year)",
-                              ),
-                      validator: (val) {
-                        if (_isCurrentEdu) return null;
-                        return (val == null || val.trim().isEmpty)
-                            ? "End date required"
-                            : null;
-                      },
-                    ),
-                  ),
-                ],
-              ),
-              // Toggle: I am currently studying here
-              CheckboxListTile(
-                contentPadding: EdgeInsets.zero,
-                title: const Text("I am currently studying here"),
-                value: _isCurrentEdu,
-                onChanged: (v) {
-                  setState(() {
-                    _isCurrentEdu = v ?? false;
-                    if (_isCurrentEdu) {
-                      _eduEndDateController.text = "Present";
-                    } else {
-                      _eduEndDateController.clear();
-                    }
-                  });
-                },
-                controlAffinity: ListTileControlAffinity.leading,
-              ),
-
-              const SizedBox(height: 16),
-              const Text(
-                "Skills",
-                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-              ),
-              _buildField(
-                label: "Add Skills (comma, semicolon, or newline separated)",
-                controller: _skillsController,
-                textCapitalization: TextCapitalization.sentences,
-                textInputAction: TextInputAction.done,
-                validator:
-                    (val) =>
-                        val == null || val.trim().isEmpty
-                            ? "At least 1 skill required"
-                            : null,
-              ),
-
-              const SizedBox(height: 24),
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blue,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                  onPressed: _generateCV,
-                  child: const Text(
-                    "Next",
-                    style: TextStyle(color: Colors.white, fontSize: 16),
                   ),
                 ),
-              ),
-            ],
+
+                const SizedBox(height: 20),
+
+                // Education
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text(
+                      "Education",
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.add),
+                      onPressed: _addEducationEntry,
+                    ),
+                  ],
+                ),
+                ..._educationEntries.map(
+                  (e) => Card(
+                    child: ListTile(
+                      title: Text("${e.degree} — ${e.institution}"),
+                      subtitle: Text(
+                        "${e.start} - ${e.end}\n${e.description ?? ''}",
+                      ),
+                      trailing: IconButton(
+                        icon: const Icon(Icons.delete, color: Colors.red),
+                        onPressed:
+                            () => setState(() => _educationEntries.remove(e)),
+                      ),
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 20),
+
+                // Skills
+                TextFormField(
+                  controller: _skillsController,
+                  decoration: const InputDecoration(
+                    labelText: "Skills (comma separated)",
+                  ),
+                ),
+
+                const SizedBox(height: 30),
+
+                // Next -> Preview
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blue,
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
+                    onPressed: _onNext,
+                    child: Text(
+                      _isEditing ? "Preview Changes" : "Next",
+                      style: const TextStyle(fontSize: 16),
+                    ),
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

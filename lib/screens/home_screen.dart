@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'cv_form_screen.dart';
 import 'cv_polisher_screen.dart';
 import 'templates_screen.dart';
@@ -8,60 +9,6 @@ import 'cover_letter_screen.dart';
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
 
-  // --- Quick Link Card ---
-  Widget _quickLinkCard({
-    required BuildContext context,
-    required IconData icon,
-    required Color color,
-    required String label,
-    required Widget screen,
-  }) {
-    return Expanded(
-      child: InkWell(
-        onTap:
-            () => Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => screen),
-            ),
-        borderRadius: BorderRadius.circular(16),
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 20),
-          margin: const EdgeInsets.symmetric(horizontal: 4),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black12,
-                blurRadius: 6,
-                offset: const Offset(0, 3),
-              ),
-            ],
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              CircleAvatar(
-                radius: 22,
-                backgroundColor: color.withOpacity(0.1),
-                child: Icon(icon, color: color, size: 26),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                label,
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  // --- Action Card ---
   Widget _buildActionCard({
     required BuildContext context,
     required IconData icon,
@@ -126,18 +73,14 @@ class HomeScreen extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('CV Helper'),
-        centerTitle: true,
-        automaticallyImplyLeading: false, // no back button
-      ),
+      appBar: AppBar(title: const Text('CV Helper'), centerTitle: true),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // --- Hero Image ---
+              // --- Hero image ---
               ClipRRect(
                 borderRadius: BorderRadius.circular(16),
                 child: Stack(
@@ -186,38 +129,9 @@ class HomeScreen extends StatelessWidget {
                 style: TextStyle(fontSize: 14, color: Colors.black87),
               ),
 
-              const SizedBox(height: 18),
-
-              // --- Quick Links ---
-              Row(
-                children: [
-                  _quickLinkCard(
-                    context: context,
-                    icon: Icons.folder_copy,
-                    color: Colors.blue,
-                    label: "My CVs",
-                    screen: const MyCvsScreen(),
-                  ),
-                  _quickLinkCard(
-                    context: context,
-                    icon: Icons.mark_email_read,
-                    color: Colors.green,
-                    label: "Cover Letter",
-                    screen: const CoverLetterScreen(),
-                  ),
-                  _quickLinkCard(
-                    context: context,
-                    icon: Icons.dashboard_customize,
-                    color: Colors.orange,
-                    label: "Templates",
-                    screen: const TemplatesScreen(),
-                  ),
-                ],
-              ),
-
               const SizedBox(height: 22),
 
-              // --- Action Cards ---
+              // action cards
               _buildActionCard(
                 context: context,
                 icon: Icons.description,
@@ -240,23 +154,32 @@ class HomeScreen extends StatelessWidget {
                 screen: const TemplatesScreen(),
               ),
 
-              const SizedBox(height: 8),
+              const SizedBox(height: 20),
 
-              // --- Tip ---
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: const [
-                  Icon(Icons.lightbulb, color: Colors.amber, size: 20),
-                  SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      "Tip: You can save any result and find it later under My CVs. Export to PDF anytime.",
-                      style: TextStyle(color: Colors.black87),
-                    ),
-                  ),
-                ],
+              // ✅ Firebase test button
+              Center(
+                child: ElevatedButton.icon(
+                  onPressed: () async {
+                    try {
+                      await FirebaseFirestore.instance.collection("test").add({
+                        "message": "Hello from Flutter!",
+                        "timestamp": DateTime.now(),
+                      });
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text("✅ Test data sent to Firestore!"),
+                        ),
+                      );
+                    } catch (e) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text("❌ Firebase error: $e")),
+                      );
+                    }
+                  },
+                  icon: const Icon(Icons.cloud),
+                  label: const Text("Test Firebase"),
+                ),
               ),
-              const SizedBox(height: 8),
             ],
           ),
         ),

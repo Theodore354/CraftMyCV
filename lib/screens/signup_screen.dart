@@ -1,69 +1,49 @@
-import 'package:cv_helper_app/screens/main_screen.dart';
-import 'package:cv_helper_app/screens/signup_screen.dart';
+import 'package:cv_helper_app/screens/login_screen.dart';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
-
-class LoginScreen extends StatefulWidget {
-  const LoginScreen({super.key});
+class SignupScreen extends StatefulWidget {
+  const SignupScreen({super.key});
 
   @override
-  State<LoginScreen> createState() => _LoginScreenState();
+  State<SignupScreen> createState() => _SignupScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _SignupScreenState extends State<SignupScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _isLoading = false;
-  bool _obscurePassword = true; // 👁️ eye toggle
+  bool _obscurePassword = true;
 
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
-  @override
-  void initState() {
-    super.initState();
-    _loadLastEmail(); // load saved email if available
-  }
-
-  Future<void> _loadLastEmail() async {
-    final prefs = await SharedPreferences.getInstance();
-    final lastEmail = prefs.getString('lastEmail');
-    if (lastEmail != null) {
-      _emailController.text = lastEmail;
-    }
-  }
-
-  Future<void> _saveLastEmail(String email) async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('lastEmail', email);
-  }
-
-  Future<void> _login() async {
+  Future<void> _signup() async {
     if (!_formKey.currentState!.validate()) return;
     setState(() => _isLoading = true);
 
     try {
-      await _auth.signInWithEmailAndPassword(
+      await _auth.createUserWithEmailAndPassword(
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
       );
 
-      await _saveLastEmail(_emailController.text.trim());
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text("Account created! Please log in.")),
+      );
 
       if (mounted) {
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (_) => const MainScreen()),
+          MaterialPageRoute(builder: (_) => const LoginScreen()),
         );
       }
     } on FirebaseAuthException catch (e) {
-      String message = "Login failed. Please try again.";
-      if (e.code == 'user-not-found') {
-        message = "No account found with this email.";
-      } else if (e.code == 'wrong-password') {
-        message = "Incorrect password.";
+      String message = "Signup failed.";
+      if (e.code == 'email-already-in-use') {
+        message = "Email already in use.";
+      } else if (e.code == 'weak-password') {
+        message = "Password must be at least 6 characters.";
       }
       ScaffoldMessenger.of(
         context,
@@ -88,7 +68,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 const SizedBox(height: 40),
                 Center(
                   child: Text(
-                    "Welcome back",
+                    "Create Account",
                     style: textTheme.headlineMedium?.copyWith(
                       fontWeight: FontWeight.bold,
                     ),
@@ -143,24 +123,9 @@ class _LoginScreenState extends State<LoginScreen> {
                       (value) =>
                           value!.length < 6 ? "Password too short" : null,
                 ),
-                const SizedBox(height: 12),
-
-                // Forgot Password
-                Align(
-                  alignment: Alignment.centerRight,
-                  child: TextButton(
-                    onPressed: () {
-                      // TODO: implement reset password
-                    },
-                    child: const Text(
-                      "Forgot Password?",
-                      style: TextStyle(color: Colors.blue),
-                    ),
-                  ),
-                ),
                 const SizedBox(height: 20),
 
-                // Login button
+                // Signup button
                 _isLoading
                     ? const Center(child: CircularProgressIndicator())
                     : SizedBox(
@@ -173,31 +138,31 @@ class _LoginScreenState extends State<LoginScreen> {
                             borderRadius: BorderRadius.circular(12),
                           ),
                         ),
-                        onPressed: _login,
+                        onPressed: _signup,
                         child: const Text(
-                          "Login",
+                          "Sign Up",
                           style: TextStyle(color: Colors.white, fontSize: 16),
                         ),
                       ),
                     ),
                 const SizedBox(height: 20),
 
-                // Sign up link
+                // Back to login link
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    const Text("Don’t have an account? "),
+                    const Text("Already have an account? "),
                     GestureDetector(
                       onTap: () {
-                        Navigator.push(
+                        Navigator.pushReplacement(
                           context,
                           MaterialPageRoute(
-                            builder: (_) => const SignupScreen(),
+                            builder: (_) => const LoginScreen(),
                           ),
                         );
                       },
                       child: const Text(
-                        "Sign up",
+                        "Login",
                         style: TextStyle(
                           color: Colors.blue,
                           fontWeight: FontWeight.bold,

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'home_screen.dart';
 import 'my_cvs_screen.dart';
 import 'templates_screen.dart';
+import 'profile_screen.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key, this.initialIndex = 0});
@@ -25,6 +26,7 @@ class _MainScreenState extends State<MainScreen> {
     HomeScreen(),
     MyCvsScreen(),
     TemplatesScreen(),
+    ProfileScreen(),
   ];
 
   void _onItemTapped(int index) {
@@ -50,6 +52,7 @@ class _MainScreenState extends State<MainScreen> {
             icon: Icon(Icons.dashboard_customize),
             label: "Templates",
           ),
+          BottomNavigationBarItem(icon: Icon(Icons.person), label: "Profile"),
         ],
       ),
     );
