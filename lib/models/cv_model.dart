@@ -1,8 +1,8 @@
 import 'package:cv_helper_app/models/index.dart';
 
 class CvModel {
-  /// Optional local id (useful now; will be required for Firestore later)
-  final String? id;
+  /// Always required now (prevents null/empty bugs in Firestore).
+  final String id;
   final String fullName;
   final String email;
   final String phone;
@@ -16,7 +16,7 @@ class CvModel {
   final int? updatedAt;
 
   CvModel({
-    this.id,
+    required this.id,
     required this.fullName,
     required this.email,
     required this.phone,
@@ -83,7 +83,7 @@ class CvModel {
         <EducationEntry>[];
 
     return CvModel(
-      id: json['id'] as String?, // may be null for older saves
+      id: (json['id'] as String?) ?? _newId(), // fallback for old saves
       fullName: json['fullName'] as String? ?? '',
       email: json['email'] as String? ?? '',
       phone: json['phone'] as String? ?? '',
@@ -97,6 +97,36 @@ class CvModel {
           <String>[],
       createdAt: json['createdAt'] as int?,
       updatedAt: json['updatedAt'] as int?,
+    );
+  }
+
+  /// Fallback ID generator
+  static String _newId() => DateTime.now().microsecondsSinceEpoch.toString();
+
+  /// Helper: Create a new CV with auto-generated ID
+  factory CvModel.ensureId({
+    String? id,
+    required String fullName,
+    required String email,
+    required String phone,
+    required String location,
+    required List<WorkEntry> workExperience,
+    required List<EducationEntry> education,
+    required List<String> skills,
+    int? createdAt,
+    int? updatedAt,
+  }) {
+    return CvModel(
+      id: id ?? _newId(),
+      fullName: fullName,
+      email: email,
+      phone: phone,
+      location: location,
+      workExperience: workExperience,
+      education: education,
+      skills: skills,
+      createdAt: createdAt,
+      updatedAt: updatedAt,
     );
   }
 

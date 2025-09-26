@@ -1,11 +1,13 @@
+// lib/screens/cv_form_screen.dart
 import 'dart:convert';
-import 'package:flutter/material.dart';
 import 'package:cv_helper_app/cv_storage.dart';
 import 'package:cv_helper_app/models/index.dart';
+import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cv_helper_app/services/firestore_service.dart';
 import 'cv_preview_screen.dart';
 
 class CvFormScreen extends StatefulWidget {
-  /// If editing, pass the existing CV and its index in CvStorage
   final CvModel? initial;
   final int? storageIndex;
 
@@ -22,16 +24,12 @@ class CvFormScreen extends StatefulWidget {
 class _CvFormScreenState extends State<CvFormScreen> {
   final _formKey = GlobalKey<FormState>();
 
-  // Basic info
   final _fullNameController = TextEditingController();
   final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
   final _locationController = TextEditingController();
-
-  // Skills (comma separated)
   final _skillsController = TextEditingController();
 
-  // Dynamic lists
   final List<WorkEntry> _workEntries = [];
   final List<EducationEntry> _educationEntries = [];
 
@@ -62,7 +60,6 @@ class _CvFormScreenState extends State<CvFormScreen> {
     super.dispose();
   }
 
-  // ====== Add Work Entry ======
   void _addWorkEntry() {
     showDialog(
       context: context,
@@ -139,7 +136,6 @@ class _CvFormScreenState extends State<CvFormScreen> {
     );
   }
 
-  // ====== Add Education Entry ======
   void _addEducationEntry() {
     showDialog(
       context: context,
@@ -214,9 +210,6 @@ class _CvFormScreenState extends State<CvFormScreen> {
     );
   }
 
-  String _newId() => DateTime.now().microsecondsSinceEpoch.toString();
-
-  // ====== Next -> Preview -> Confirm & Save/Update ======
   Future<void> _onNext() async {
     if (!(_formKey.currentState?.validate() ?? false)) return;
 
@@ -229,8 +222,8 @@ class _CvFormScreenState extends State<CvFormScreen> {
 
     final now = DateTime.now().millisecondsSinceEpoch;
 
-    final base = CvModel(
-      id: _isEditing ? widget.initial!.id : _newId(),
+    final base = CvModel.ensureId(
+      id: _isEditing ? widget.initial!.id : null,
       fullName: _fullNameController.text.trim(),
       email: _emailController.text.trim(),
       phone: _phoneController.text.trim(),
@@ -242,7 +235,6 @@ class _CvFormScreenState extends State<CvFormScreen> {
       updatedAt: now,
     );
 
-    // 1) Preview
     final confirmed = await Navigator.of(context).push<bool>(
       MaterialPageRoute(
         builder: (_) => CvPreviewScreen(cv: base),
@@ -250,21 +242,48 @@ class _CvFormScreenState extends State<CvFormScreen> {
       ),
     );
 
-    // 2) Persist only if confirmed
     if (confirmed == true) {
-      final jsonStr = jsonEncode(base.toJson());
-
-      if (_isEditing) {
-        await CvStorage.update(widget.storageIndex!, jsonStr);
+      final user = FirebaseAuth.instance.currentUser;
+      if (user != null) {
+        try {
+          final docId = await FirestoreService.saveCv(user.uid, base);
+          final saved = base.copyWith(
+            id: docId,
+            createdAt: base.createdAt ?? now,
+            updatedAt: DateTime.now().millisecondsSinceEpoch,
+          );
+          final jsonStr = jsonEncode(saved.toJson());
+          if (_isEditing) {
+            await CvStorage.update(widget.storageIndex!, jsonStr);
+          } else {
+            await CvStorage.add(jsonStr);
+          }
+        } catch (e) {
+          final jsonStr = jsonEncode(base.toJson());
+          if (_isEditing) {
+            await CvStorage.update(widget.storageIndex!, jsonStr);
+          } else {
+            await CvStorage.add(jsonStr);
+          }
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('Saved locally (Firestore error): $e')),
+            );
+          }
+        }
       } else {
-        await CvStorage.add(jsonStr);
+        final jsonStr = jsonEncode(base.toJson());
+        if (_isEditing) {
+          await CvStorage.update(widget.storageIndex!, jsonStr);
+        } else {
+          await CvStorage.add(jsonStr);
+        }
       }
 
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text(_isEditing ? 'CV updated' : 'CV saved')),
       );
-
       Navigator.of(context).pop(true);
     }
   }
@@ -272,145 +291,108 @@ class _CvFormScreenState extends State<CvFormScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: Text(_isEditing ? "Edit CV" : "Build Your CV")),
-      body: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Form(
-          key: _formKey,
-          child: SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Basic Info
-                TextFormField(
-                  controller: _fullNameController,
-                  decoration: const InputDecoration(labelText: "Full Name"),
-                  validator:
-                      (v) =>
-                          (v == null || v.trim().isEmpty)
-                              ? "Enter your name"
-                              : null,
+      appBar: AppBar(title: Text(_isEditing ? "Edit CV" : "Create CV")),
+      body: Form(
+        key: _formKey,
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              TextFormField(
+                controller: _fullNameController,
+                decoration: const InputDecoration(labelText: "Full Name"),
+                validator: (v) => v == null || v.isEmpty ? "Required" : null,
+              ),
+              TextFormField(
+                controller: _emailController,
+                decoration: const InputDecoration(labelText: "Email"),
+                validator:
+                    (v) =>
+                        v == null || !v.contains('@')
+                            ? "Enter valid email"
+                            : null,
+              ),
+              TextFormField(
+                controller: _phoneController,
+                decoration: const InputDecoration(labelText: "Phone"),
+              ),
+              TextFormField(
+                controller: _locationController,
+                decoration: const InputDecoration(labelText: "Location"),
+              ),
+              const SizedBox(height: 20),
+              TextFormField(
+                controller: _skillsController,
+                decoration: const InputDecoration(
+                  labelText: "Skills (comma separated)",
                 ),
-                TextFormField(
-                  controller: _emailController,
-                  decoration: const InputDecoration(labelText: "Email"),
-                  keyboardType: TextInputType.emailAddress,
-                  validator: (v) {
-                    final value = v?.trim() ?? '';
-                    final ok = RegExp(r'^\S+@\S+\.\S+$').hasMatch(value);
-                    return ok ? null : 'Enter a valid email';
-                  },
-                ),
-                TextFormField(
-                  controller: _phoneController,
-                  decoration: const InputDecoration(labelText: "Phone"),
-                ),
-                TextFormField(
-                  controller: _locationController,
-                  decoration: const InputDecoration(labelText: "Location"),
-                ),
-                const SizedBox(height: 20),
+              ),
+              const SizedBox(height: 20),
 
-                // Work Experience
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      "Work Experience",
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.add),
-                      onPressed: _addWorkEntry,
-                    ),
-                  ],
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    "Work Experience",
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.add),
+                    onPressed: _addWorkEntry,
+                  ),
+                ],
+              ),
+              ..._workEntries.map(
+                (w) => ListTile(
+                  title: Text("${w.jobTitle} — ${w.company}"),
+                  subtitle: Text("${w.start} - ${w.end}"),
                 ),
-                ..._workEntries.map(
-                  (w) => Card(
-                    child: ListTile(
-                      title: Text("${w.jobTitle} at ${w.company}"),
-                      subtitle: Text(
-                        "${w.start} - ${w.end}\n${w.responsibilities ?? ''}",
-                      ),
-                      trailing: IconButton(
-                        icon: const Icon(Icons.delete, color: Colors.red),
-                        onPressed: () => setState(() => _workEntries.remove(w)),
-                      ),
+              ),
+
+              const SizedBox(height: 20),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    "Education",
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                  IconButton(
+                    icon: const Icon(Icons.add),
+                    onPressed: _addEducationEntry,
+                  ),
+                ],
+              ),
+              ..._educationEntries.map(
+                (e) => ListTile(
+                  title: Text("${e.degree} — ${e.institution}"),
+                  subtitle: Text("${e.start} - ${e.end}"),
+                ),
+              ),
+
+              const SizedBox(height: 40),
+              Center(
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blue,
+                    foregroundColor: Colors.white,
+                    minimumSize: const Size(double.infinity, 50),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
+                  onPressed: _onNext,
+                  child: Text(
+                    _isEditing ? "Update CV" : "Next",
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
                 ),
-
-                const SizedBox(height: 20),
-
-                // Education
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
-                      "Education",
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.add),
-                      onPressed: _addEducationEntry,
-                    ),
-                  ],
-                ),
-                ..._educationEntries.map(
-                  (e) => Card(
-                    child: ListTile(
-                      title: Text("${e.degree} — ${e.institution}"),
-                      subtitle: Text(
-                        "${e.start} - ${e.end}\n${e.description ?? ''}",
-                      ),
-                      trailing: IconButton(
-                        icon: const Icon(Icons.delete, color: Colors.red),
-                        onPressed:
-                            () => setState(() => _educationEntries.remove(e)),
-                      ),
-                    ),
-                  ),
-                ),
-
-                const SizedBox(height: 20),
-
-                // Skills
-                TextFormField(
-                  controller: _skillsController,
-                  decoration: const InputDecoration(
-                    labelText: "Skills (comma separated)",
-                  ),
-                ),
-
-                const SizedBox(height: 30),
-
-                // Next -> Preview
-                SizedBox(
-                  width: double.infinity,
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.blue,
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                    ),
-                    onPressed: _onNext,
-                    child: Text(
-                      _isEditing ? "Preview Changes" : "Next",
-                      style: const TextStyle(fontSize: 16),
-                    ),
-                  ),
-                ),
-              ],
-            ),
+              ),
+            ],
           ),
         ),
       ),
