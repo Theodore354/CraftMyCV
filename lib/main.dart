@@ -5,6 +5,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'firebase_options.dart';
 import 'cv_storage.dart';
+import 'package:cv_helper_app/theme/app_theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -25,8 +26,13 @@ class CvHelperApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'CV Helper',
-      theme: ThemeData(useMaterial3: true, colorSchemeSeed: Colors.blue),
       debugShowCheckedModeBanner: false,
+
+      
+      theme: AppTheme.light,
+      darkTheme: AppTheme.dark,
+      themeMode: ThemeMode.system, 
+
       home: const AuthWrapper(),
     );
   }
@@ -45,8 +51,11 @@ class AuthWrapper extends StatelessWidget {
             body: Center(child: CircularProgressIndicator()),
           );
         } else if (snapshot.hasData) {
+          // User logged in → show main screen
           return const MainScreen();
         } else {
+          // User logged out → clear cached CVs for privacy
+          CvStorage.clear();
           return const LoginScreen();
         }
       },

@@ -1,12 +1,14 @@
+import 'package:flutter/foundation.dart';
 
+@immutable
 class WorkEntry {
   final String jobTitle;
   final String company;
   final String start;
   final String end;
-  final String? responsibilities; 
+  final String? responsibilities;
 
-  WorkEntry({
+  const WorkEntry({
     required this.jobTitle,
     required this.company,
     required this.start,
@@ -14,31 +16,20 @@ class WorkEntry {
     this.responsibilities,
   });
 
-  Map<String, dynamic> toJson() {
-    return {
-      'jobTitle': jobTitle,
-      'company': company,
-      'start': start,
-      'end': end,
+  factory WorkEntry.fromMap(Map<String, dynamic> map) => WorkEntry(
+    jobTitle: (map['jobTitle'] ?? '').toString(),
+    company: (map['company'] ?? '').toString(),
+    start: (map['start'] ?? '').toString(),
+    end: (map['end'] ?? '').toString(),
+    responsibilities: map['responsibilities'] as String?,
+  );
+
+  Map<String, dynamic> toMap() => {
+    'jobTitle': jobTitle,
+    'company': company,
+    'start': start,
+    'end': end,
+    if (responsibilities != null && responsibilities!.isNotEmpty)
       'responsibilities': responsibilities,
-    };
-  }
-
-  factory WorkEntry.fromJson(Map<String, dynamic> json) {
-    return WorkEntry(
-      jobTitle: json['jobTitle'] as String? ?? '',
-      company: json['company'] as String? ?? '',
-      start: json['start'] as String? ?? '',
-      end: json['end'] as String? ?? '',
-      responsibilities: json['responsibilities'] as String?,
-    );
-  }
-
-  String toPlainText() {
-    final resp =
-        (responsibilities == null || responsibilities!.isEmpty)
-            ? ''
-            : '\n$responsibilities';
-    return '$jobTitle — $company\n$start — $end$resp';
-  }
+  };
 }

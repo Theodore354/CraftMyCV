@@ -1,7 +1,6 @@
 import 'package:cv_helper_app/screens/results_screen.dart';
 import 'package:flutter/material.dart';
 
-
 class CoverLetterScreen extends StatefulWidget {
   const CoverLetterScreen({super.key});
 
@@ -10,30 +9,36 @@ class CoverLetterScreen extends StatefulWidget {
 }
 
 class _CoverLetterScreenState extends State<CoverLetterScreen> {
+  final _formKey = GlobalKey<FormState>();
   final _jobTitleController = TextEditingController();
   final _companyController = TextEditingController();
   final _jobDescriptionController = TextEditingController();
 
+  @override
+  void dispose() {
+    _jobTitleController.dispose();
+    _companyController.dispose();
+    _jobDescriptionController.dispose();
+    super.dispose();
+  }
+
   void _generateLetter() {
-    if (_jobTitleController.text.isEmpty ||
-        _companyController.text.isEmpty ||
-        _jobDescriptionController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text("Please fill in all fields")),
-      );
-      return;
-    }
+    if (!_formKey.currentState!.validate()) return;
+
+    final title = _jobTitleController.text.trim();
+    final company = _companyController.text.trim();
+    final desc = _jobDescriptionController.text.trim();
 
     final dummyLetter = """
 Dear Hiring Manager,
 
-I am excited to apply for the ${_jobTitleController.text} role at ${_companyController.text}. 
-With my background and skills, I believe I am an excellent fit for this opportunity. 
+I am excited to apply for the $title role at $company.
+With my background and skills, I believe I am an excellent fit for this opportunity.
 
 Job Description Highlights:
-${_jobDescriptionController.text}
+$desc
 
-Thank you for considering my application. 
+Thank you for considering my application.
 I look forward to the opportunity to contribute to your team.
 
 Sincerely,
@@ -48,63 +53,81 @@ Sincerely,
     );
   }
 
-  Widget _buildField({
-    required String label,
-    required TextEditingController controller,
-    int maxLines = 1,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
-      child: TextField(
-        controller: controller,
-        maxLines: maxLines,
-        decoration: InputDecoration(
-          labelText: label,
-          filled: true,
-          fillColor: Colors.grey.shade200,
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(12),
-            borderSide: BorderSide.none,
-          ),
-        ),
+  InputDecoration _decoration(String label, {String? hint}) {
+    return InputDecoration(
+      labelText: label,
+      hintText: hint,
+      filled: true,
+      fillColor: Colors.grey.shade100,
+      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+      border: OutlineInputBorder(
+        borderRadius: BorderRadius.circular(10), // rectangular vibe
+        borderSide: BorderSide.none,
       ),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
     return Scaffold(
       appBar: AppBar(title: const Text("Cover Letter"), centerTitle: true),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            _buildField(label: "Job Title", controller: _jobTitleController),
-            _buildField(label: "Company Name", controller: _companyController),
-            _buildField(
-              label: "Job Description / Requirements",
-              controller: _jobDescriptionController,
-              maxLines: 5,
-            ),
-            const SizedBox(height: 24),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.blue,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
+        child: Form(
+          key: _formKey,
+          child: Column(
+            children: [
+              TextFormField(
+                controller: _jobTitleController,
+                textInputAction: TextInputAction.next,
+                decoration: _decoration("Job Title"),
+                validator:
+                    (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _companyController,
+                textInputAction: TextInputAction.next,
+                decoration: _decoration("Company Name"),
+                validator:
+                    (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+              ),
+              const SizedBox(height: 12),
+              TextFormField(
+                controller: _jobDescriptionController,
+                minLines: 5,
+                maxLines: 10,
+                decoration: _decoration(
+                  "Job Description / Requirements",
+                  hint: "Paste key responsibilities or the JD here…",
                 ),
-                onPressed: _generateLetter,
-                child: const Text(
-                  "Generate Cover Letter",
-                  style: TextStyle(color: Colors.white, fontSize: 16),
+                validator:
+                    (v) => (v == null || v.trim().isEmpty) ? 'Required' : null,
+              ),
+              const SizedBox(height: 24),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton(
+                  onPressed: _generateLetter,
+                  style: FilledButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    backgroundColor: scheme.primary,
+                    foregroundColor: scheme.onPrimary,
+                    textStyle: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  child: const Text("Generate Cover Letter"),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

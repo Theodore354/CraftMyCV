@@ -1,12 +1,14 @@
+import 'package:flutter/foundation.dart';
 
+@immutable
 class EducationEntry {
   final String degree;
   final String institution;
-  final String start; // stored as "MMM yyyy" or "Present"
-  final String end; // stored as "MMM yyyy" or "Present"
-  final String? description; // optional notes
+  final String start;
+  final String end;
+  final String? description;
 
-  EducationEntry({
+  const EducationEntry({
     required this.degree,
     required this.institution,
     required this.start,
@@ -14,30 +16,20 @@ class EducationEntry {
     this.description,
   });
 
-  Map<String, dynamic> toJson() {
-    return {
-      'degree': degree,
-      'institution': institution,
-      'start': start,
-      'end': end,
+  factory EducationEntry.fromMap(Map<String, dynamic> map) => EducationEntry(
+    degree: (map['degree'] ?? '').toString(),
+    institution: (map['institution'] ?? '').toString(),
+    start: (map['start'] ?? '').toString(),
+    end: (map['end'] ?? '').toString(),
+    description: (map['description'] as String?),
+  );
+
+  Map<String, dynamic> toMap() => {
+    'degree': degree,
+    'institution': institution,
+    'start': start,
+    'end': end,
+    if (description != null && description!.isNotEmpty)
       'description': description,
-    };
-  }
-
-  factory EducationEntry.fromJson(Map<String, dynamic> json) {
-    return EducationEntry(
-      degree: json['degree'] as String? ?? '',
-      institution: json['institution'] as String? ?? '',
-      start: json['start'] as String? ?? '',
-      end: json['end'] as String? ?? '',
-      description: json['description'] as String?,
-    );
-  }
-
-  /// Helpful plain-text representation (used for preview/printing)
-  String toPlainText() {
-    final desc =
-        (description == null || description!.isEmpty) ? '' : '\n$description';
-    return '$degree — $institution\n$start — $end$desc';
-  }
+  };
 }

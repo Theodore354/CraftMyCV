@@ -1,47 +1,84 @@
-// lib/services/firestore_service.dart
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:cv_helper_app/models/index.dart';
+import 'package:cv_helper_app/models/cv_model.dart';
 
 class FirestoreService {
-  static final _db = FirebaseFirestore.instance;
+  static CollectionReference<Map<String, dynamic>> _userCvsRef(String uid) =>
+      FirebaseFirestore.instance.collection('users').doc(uid).collection('cvs');
 
-  /// Save (create or update) a CV document under the user's collection.
-  /// Returns the Firestore document ID used.
-  static Future<String> saveCv(String userId, CvModel cv) async {
-    final userRef = _db.collection('users').doc(userId).collection('cvs');
+  /// One-shot fetch (sorted by last update).
+  static Future<List<CvModel>> getCvs(String uid) async {
+    final snap =
+        await _userCvsRef(uid).orderBy('updatedAt', descending: true).get();
+    return snap.docs.map((d) => CvModel.fromMap(d.data(), id: d.id)).toList();
+  }
 
-    if (cv.id == null || cv.id!.isEmpty) {
-      // Create new doc
-      final docRef = await userRef.add(cv.toJson());
-      return docRef.id;
+  /// Live stream (handy for list screens).
+  static Stream<List<CvModel>> watchCvs(String uid) {
+    return _userCvsRef(uid)
+        .orderBy('updatedAt', descending: true)
+        .snapshots()
+        .map(
+          (s) =>
+              s.docs.map((d) => CvModel.fromMap(d.data(), id: d.id)).toList(),
+        );
+  }
+
+  /// Fetch a single CV.
+  static Future<CvModel?> getCv(String uid, String cvId) async {
+    final doc = await _userCvsRef(uid).doc(cvId).get();
+    if (!doc.exists) return null;
+    return CvModel.fromMap(doc.data()!, id: doc.id);
+  }
+
+  /// Watch a single CV.
+  static Stream<CvModel?> watchCv(String uid, String cvId) {
+    return _userCvsRef(uid).doc(cvId).snapshots().map((d) {
+      if (!d.exists) return null;
+      return CvModel.fromMap(d.data()!, id: d.id);
+    });
+  }
+
+  /// Create or update. Returns the document id.
+  static Future<String> upsertCv(String uid, CvModel cv) async {
+    if (cv.id.isEmpty) {
+      // Create
+      final doc = _userCvsRef(uid).doc(); // auto id
+      final data = <String, dynamic>{
+        ...cv.toMap(),
+        'id': doc.id, // optional but convenient
+        'createdAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      };
+      await doc.set(data);
+      return doc.id;
     } else {
-      // Update existing or create with provided ID
-      final docRef = userRef.doc(cv.id);
-      await docRef.set(cv.toJson(), SetOptions(merge: true));
-      return docRef.id;
+      // Update
+      final data = <String, dynamic>{
+        ...cv.toMap(),
+        'updatedAt': FieldValue.serverTimestamp(),
+      };
+      await _userCvsRef(uid).doc(cv.id).set(data, SetOptions(merge: true));
+      return cv.id;
     }
   }
 
-  /// Load all CVs for a user.
-  static Future<List<CvModel>> getCvs(String userId) async {
-    final snapshot =
-        await _db.collection('users').doc(userId).collection('cvs').get();
-
-    return snapshot.docs.map((doc) {
-      final data = doc.data();
-      final cv = CvModel.fromJson(data);
-      // Ensure Firestore ID is also set
-      return cv.copyWith(id: doc.id);
-    }).toList();
+  static Future<void> deleteCv(String uid, String cvId) async {
+    await _userCvsRef(uid).doc(cvId).delete();
   }
 
-  /// Delete a CV by ID
-  static Future<void> deleteCv(String userId, String cvId) async {
-    await _db
-        .collection('users')
-        .doc(userId)
-        .collection('cvs')
-        .doc(cvId)
-        .delete();
+  /// Optional: one-time fixer if you ever saved `updatedAt` as int in the past.
+  /// Run it once to standardize types so orderBy works reliably.
+  static Future<void> normalizeUpdatedAt(String uid) async {
+    final col = _userCvsRef(uid);
+    final snap = await col.get();
+    final batch = FirebaseFirestore.instance.batch();
+    for (final d in snap.docs) {
+      batch.set(d.reference, {
+        'updatedAt': FieldValue.serverTimestamp(),
+        // set createdAt too if you want to ensure it's present everywhere
+        'createdAt': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+    }
+    await batch.commit();
   }
 }

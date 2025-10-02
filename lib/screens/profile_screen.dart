@@ -1,19 +1,19 @@
+// lib/screens/profile_screen.dart
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'login_screen.dart';
+import '../cv_storage.dart';
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
 
   Future<void> _logout(BuildContext context) async {
+    // Clear local cached CVs for privacy
+    await CvStorage.clear();
+
+    // Sign out from Firebase
     await FirebaseAuth.instance.signOut();
-    if (context.mounted) {
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(builder: (_) => const LoginScreen()),
-        (route) => false,
-      );
-    }
+    
+    
   }
 
   @override

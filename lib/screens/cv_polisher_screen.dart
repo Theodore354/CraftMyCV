@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:dotted_border/dotted_border.dart';
@@ -61,6 +60,9 @@ class _PolishCVScreenState extends State<PolishCVScreen> {
     return '${len.toStringAsFixed(1)} ${sizes[order]}';
   }
 
+  bool get _canPolish =>
+      _file != null || _pasteController.text.trim().isNotEmpty;
+
   void _onPolish() {
     final pasted = _pasteController.text.trim();
     final improve = _improvementController.text.trim();
@@ -107,13 +109,9 @@ Sample reworded summary:
     );
   }
 
-  bool get _canPolish =>
-      _file != null || _pasteController.text.trim().isNotEmpty;
-
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    // Blue that matches the screenshot button
 
     return Scaffold(
       appBar: AppBar(
@@ -182,7 +180,6 @@ Sample reworded summary:
                                 textAlign: TextAlign.center,
                               ),
                               const SizedBox(height: 20),
-                              // Small "Upload" pill button in the card
                               ConstrainedBox(
                                 constraints: const BoxConstraints(
                                   minWidth: 120,
@@ -200,7 +197,16 @@ Sample reworded summary:
                                       vertical: 12,
                                     ),
                                   ),
-                                  child: const Text('Upload'),
+                                  child:
+                                      _picking
+                                          ? const SizedBox(
+                                            width: 16,
+                                            height: 16,
+                                            child: CircularProgressIndicator(
+                                              strokeWidth: 2,
+                                            ),
+                                          )
+                                          : const Text('Upload'),
                                 ),
                               ),
                               const SizedBox(height: 4),
@@ -231,7 +237,6 @@ Sample reworded summary:
                                         fontWeight: FontWeight.w700,
                                       ),
                                     ),
-                                    const SizedBox(height: 2),
                                     const SizedBox(height: 2),
                                     Text(
                                       _fmtBytes(_file!.size),
@@ -317,7 +322,6 @@ Sample reworded summary:
           ],
         ),
       ),
-      // === Polish CV button to match UI ===
       bottomNavigationBar: Padding(
         padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
         child: SizedBox(
@@ -327,8 +331,6 @@ Sample reworded summary:
             onPressed: _canPolish ? _onPolish : null,
             style: FilledButton.styleFrom(
               backgroundColor: const Color.fromARGB(255, 29, 138, 248),
-              disabledBackgroundColor: Color.fromARGB(255, 10, 132, 255).withOpacity(0.9),
- 
               foregroundColor: Colors.white,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(12),

@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -17,22 +16,27 @@ class _LoginScreenState extends State<LoginScreen> {
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
   bool _isLoading = false;
-  bool _obscurePassword = true; // 👁️ eye toggle
+  bool _obscurePassword = true;
 
   final FirebaseAuth _auth = FirebaseAuth.instance;
 
   @override
   void initState() {
     super.initState();
-    _loadLastEmail(); // load saved email if available
+    _loadLastEmail();
+  }
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadLastEmail() async {
     final prefs = await SharedPreferences.getInstance();
     final lastEmail = prefs.getString('lastEmail');
-    if (lastEmail != null) {
-      _emailController.text = lastEmail;
-    }
+    if (lastEmail != null) _emailController.text = lastEmail;
   }
 
   Future<void> _saveLastEmail(String email) async {
@@ -49,28 +53,52 @@ class _LoginScreenState extends State<LoginScreen> {
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
       );
-
       await _saveLastEmail(_emailController.text.trim());
-
-      if (mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const MainScreen()),
-        );
-      }
+      if (!mounted) return;
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const MainScreen()),
+      );
     } on FirebaseAuthException catch (e) {
       String message = "Login failed. Please try again.";
-      if (e.code == 'user-not-found') {
+      if (e.code == 'user-not-found')
         message = "No account found with this email.";
-      } else if (e.code == 'wrong-password') {
-        message = "Incorrect password.";
-      }
+      if (e.code == 'wrong-password') message = "Incorrect password.";
+      if (e.code == 'invalid-email') message = "Invalid email address.";
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text(message)));
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
+  }
+
+  Future<void> _forgotPassword() async {
+    final email = _emailController.text.trim();
+    if (email.isEmpty) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('Enter your email first')));
+      return;
+    }
+    try {
+      await _auth.sendPasswordResetEmail(email: email);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Password reset email sent.')),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to send reset email: $e')));
+    }
+  }
+
+  String? _emailValidator(String? v) {
+    if (v == null || v.trim().isEmpty) return "Please enter your email";
+    final ok = RegExp(r'^[^@\s]+@[^@\s]+\.[^@\s]+$').hasMatch(v.trim());
+    return ok ? null : "Enter a valid email";
   }
 
   @override
@@ -99,6 +127,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 // Email
                 TextFormField(
                   controller: _emailController,
+                  keyboardType: TextInputType.emailAddress,
                   decoration: InputDecoration(
                     labelText: "Email",
                     filled: true,
@@ -108,9 +137,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       borderSide: BorderSide.none,
                     ),
                   ),
-                  validator:
-                      (value) =>
-                          value!.isEmpty ? "Please enter your email" : null,
+                  validator: _emailValidator,
                 ),
                 const SizedBox(height: 16),
 
@@ -132,16 +159,17 @@ class _LoginScreenState extends State<LoginScreen> {
                             ? Icons.visibility_off
                             : Icons.visibility,
                       ),
-                      onPressed: () {
-                        setState(() {
-                          _obscurePassword = !_obscurePassword;
-                        });
-                      },
+                      onPressed:
+                          () => setState(
+                            () => _obscurePassword = !_obscurePassword,
+                          ),
                     ),
                   ),
                   validator:
                       (value) =>
-                          value!.length < 6 ? "Password too short" : null,
+                          (value == null || value.length < 6)
+                              ? "Password too short"
+                              : null,
                 ),
                 const SizedBox(height: 12),
 
@@ -149,9 +177,7 @@ class _LoginScreenState extends State<LoginScreen> {
                 Align(
                   alignment: Alignment.centerRight,
                   child: TextButton(
-                    onPressed: () {
-                      // TODO: implement reset password
-                    },
+                    onPressed: _forgotPassword,
                     child: const Text(
                       "Forgot Password?",
                       style: TextStyle(color: Colors.blue),

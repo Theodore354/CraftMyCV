@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cv_helper_app/models/index.dart';
+import 'package:cv_helper_app/services/pdf_service.dart';
 
 class CvPreviewScreen extends StatelessWidget {
   final CvModel cv;
@@ -7,84 +8,391 @@ class CvPreviewScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
     return Scaffold(
-      appBar: AppBar(title: const Text('Preview')),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: ListView(
-          children: [
-            Text(cv.fullName, style: Theme.of(context).textTheme.headlineSmall),
-            const SizedBox(height: 4),
-            if (cv.email.isNotEmpty) Text(cv.email),
-            if (cv.phone.isNotEmpty) Text(cv.phone),
-            if (cv.location.isNotEmpty) Text(cv.location),
-            const SizedBox(height: 16),
-
-            if (cv.workExperience.isNotEmpty) ...[
-              Text(
-                'Work Experience',
-                style: Theme.of(context).textTheme.titleMedium,
+      appBar: AppBar(
+        title: const Text('Preview'),
+        actions: [
+          IconButton(
+            tooltip: 'Export PDF',
+            onPressed: () => PdfService.previewPdfFromCv(cv),
+            icon: const Icon(Icons.picture_as_pdf_outlined),
+          ),
+        ],
+      ),
+      // Sticky rectangular buttons at the bottom
+      bottomNavigationBar: _BottomActions(
+        onEdit: () => Navigator.of(context).pop(false),
+        onConfirm: () => Navigator.of(context).pop(true),
+      ),
+      body: ListView(
+        padding: EdgeInsets.zero,
+        children: [
+          // Header
+          Container(
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [scheme.primary, scheme.secondary],
+                begin: Alignment.centerLeft,
+                end: Alignment.centerRight,
               ),
-              const SizedBox(height: 8),
-              ...cv.workExperience.map(
-                (w) => ListTile(
-                  title: Text('${w.jobTitle} — ${w.company}'),
-                  subtitle: Text(
-                    '${w.start} — ${w.end}'
-                    '${(w.responsibilities == null || w.responsibilities!.isEmpty) ? '' : '\n${w.responsibilities}'}',
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-            ],
-
-            if (cv.education.isNotEmpty) ...[
-              Text('Education', style: Theme.of(context).textTheme.titleMedium),
-              const SizedBox(height: 8),
-              ...cv.education.map(
-                (e) => ListTile(
-                  title: Text('${e.degree} — ${e.institution}'),
-                  subtitle: Text(
-                    '${e.start} — ${e.end}'
-                    '${(e.description == null || e.description!.isEmpty) ? '' : '\n${e.description}'}',
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-            ],
-
-            if (cv.skills.isNotEmpty) ...[
-              Text('Skills', style: Theme.of(context).textTheme.titleMedium),
-              const SizedBox(height: 8),
-              Wrap(
-                spacing: 8,
-                runSpacing: -8,
-                children: cv.skills.map((s) => Chip(label: Text(s))).toList(),
-              ),
-              const SizedBox(height: 16),
-            ],
-
-            const SizedBox(height: 12),
-            Row(
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () => Navigator.of(context).pop(false),
-                    child: const Text('Edit'),
-                  ),
+                // Name + initials avatar
+                Row(
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    _InitialsAvatar(name: cv.fullName),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Text(
+                        cv.fullName.isEmpty ? 'Your Name' : cv.fullName,
+                        style: textTheme.headlineSmall?.copyWith(
+                          color: scheme.onPrimary,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                  ],
                 ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: FilledButton(
-                    onPressed: () => Navigator.of(context).pop(true),
-                    child: const Text('Confirm & Save'),
-                  ),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: [
+                    if (cv.email.isNotEmpty)
+                      _ContactPill(icon: Icons.mail_outline, text: cv.email),
+                    if (cv.phone.isNotEmpty)
+                      _ContactPill(icon: Icons.phone_iphone, text: cv.phone),
+                    if (cv.location.isNotEmpty)
+                      _ContactPill(
+                        icon: Icons.location_on_outlined,
+                        text: cv.location,
+                      ),
+                  ],
                 ),
               ],
+            ),
+          ),
+
+          // Body
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              children: [
+                if (cv.workExperience.isNotEmpty)
+                  _Section(
+                    title: 'Work Experience',
+                    child: Column(
+                      children: [
+                        for (final w in cv.workExperience)
+                          _BlockCard(
+                            leadingIcon: Icons.work_outline,
+                            title: '${w.jobTitle} — ${w.company}',
+                            subtitle: '${w.start} — ${w.end}',
+                            bullets: _splitBullets(w.responsibilities),
+                          ),
+                      ],
+                    ),
+                  ),
+
+                if (cv.education.isNotEmpty)
+                  _Section(
+                    title: 'Education',
+                    child: Column(
+                      children: [
+                        for (final e in cv.education)
+                          _BlockCard(
+                            leadingIcon: Icons.school_outlined,
+                            title: '${e.degree} — ${e.institution}',
+                            subtitle: '${e.start} — ${e.end}',
+                            bullets: _splitBullets(e.description),
+                          ),
+                      ],
+                    ),
+                  ),
+
+                if (cv.skills.isNotEmpty)
+                  _Section(
+                    title: 'Skills',
+                    child: Align(
+                      alignment: Alignment.centerLeft,
+                      child: Wrap(
+                        spacing: 8,
+                        runSpacing: 8,
+                        children:
+                            cv.skills.map((s) => Chip(label: Text(s))).toList(),
+                      ),
+                    ),
+                  ),
+                const SizedBox(
+                  height: 84,
+                ), // extra space so content isn't hidden behind bottom bar
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// ===== Bottom action bar with rectangular buttons =====
+class _BottomActions extends StatelessWidget {
+  final VoidCallback onEdit;
+  final VoidCallback onConfirm;
+  const _BottomActions({required this.onEdit, required this.onConfirm});
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+
+    return SafeArea(
+      top: false,
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(16, 12, 16, 16),
+        decoration: BoxDecoration(
+          color: Theme.of(context).scaffoldBackgroundColor,
+          boxShadow: const [
+            BoxShadow(
+              color: Color(0x1A000000),
+              blurRadius: 12,
+              offset: Offset(0, -2),
+            ),
+          ],
+          border: Border(
+            top: BorderSide(color: scheme.outlineVariant.withOpacity(.5)),
+          ),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: OutlinedButton(
+                onPressed: onEdit,
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  side: BorderSide(color: scheme.primary, width: 1),
+                  textStyle: const TextStyle(fontWeight: FontWeight.w700),
+                ),
+                child: const Text('Edit'),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: FilledButton(
+                onPressed: onConfirm,
+                style: FilledButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  backgroundColor: scheme.primary,
+                  foregroundColor: scheme.onPrimary,
+                  elevation: 0,
+                  textStyle: const TextStyle(fontWeight: FontWeight.w800),
+                ),
+                child: const Text('Confirm & Save'),
+              ),
             ),
           ],
         ),
       ),
     );
   }
+}
+
+/// ===== UI helpers =====
+
+class _Section extends StatelessWidget {
+  final String title;
+  final Widget child;
+  const _Section({required this.title, required this.child});
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 20),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              Text(
+                title,
+                style: textTheme.titleMedium?.copyWith(
+                  color: scheme.primary,
+                  fontWeight: FontWeight.w800,
+                  letterSpacing: .2,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Container(
+                  height: 1,
+                  color: scheme.outlineVariant.withOpacity(.6),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 10),
+          child,
+        ],
+      ),
+    );
+  }
+}
+
+class _BlockCard extends StatelessWidget {
+  final IconData leadingIcon;
+  final String title;
+  final String subtitle;
+  final List<String> bullets;
+
+  const _BlockCard({
+    required this.leadingIcon,
+    required this.title,
+    required this.subtitle,
+    required this.bullets,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Theme.of(context).cardColor,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: scheme.outlineVariant.withOpacity(.5)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(leadingIcon, color: scheme.primary),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: textTheme.titleSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  subtitle,
+                  style: textTheme.bodySmall?.copyWith(color: scheme.outline),
+                ),
+                if (bullets.isNotEmpty) const SizedBox(height: 8),
+                if (bullets.isNotEmpty)
+                  Column(
+                    children:
+                        bullets
+                            .map(
+                              (b) => Padding(
+                                padding: const EdgeInsets.only(bottom: 4),
+                                child: Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text('•  '),
+                                    Expanded(child: Text(b)),
+                                  ],
+                                ),
+                              ),
+                            )
+                            .toList(),
+                  ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ContactPill extends StatelessWidget {
+  final IconData icon;
+  final String text;
+  const _ContactPill({required this.icon, required this.text});
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: scheme.onPrimary.withOpacity(.12),
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 16, color: scheme.onPrimary),
+          const SizedBox(width: 6),
+          Text(
+            text,
+            style: TextStyle(
+              color: scheme.onPrimary,
+              fontSize: 12.5,
+              height: 1.2,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _InitialsAvatar extends StatelessWidget {
+  final String name;
+  const _InitialsAvatar({required this.name});
+
+  String _initials(String s) {
+    final parts =
+        s.trim().split(RegExp(r'\s+')).where((e) => e.isNotEmpty).toList();
+    if (parts.isEmpty) return '👤';
+    final first = parts.first[0];
+    final last = parts.length > 1 ? parts.last[0] : '';
+    return (first + last).toUpperCase();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return CircleAvatar(
+      radius: 22,
+      backgroundColor: scheme.onPrimary.withOpacity(.15),
+      child: Text(
+        _initials(name),
+        style: TextStyle(color: scheme.onPrimary, fontWeight: FontWeight.w800),
+      ),
+    );
+  }
+}
+
+List<String> _splitBullets(String? text) {
+  if (text == null) return const [];
+  final raw = text.trim();
+  if (raw.isEmpty) return const [];
+  return raw
+      .split(RegExp(r'[\n;]+'))
+      .map((e) => e.trim())
+      .where((e) => e.isNotEmpty)
+      .toList();
 }

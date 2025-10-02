@@ -1,7 +1,7 @@
+import 'package:cv_helper_app/screens/cv_polisher_screen.dart';
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
 import 'cv_form_screen.dart';
-import 'cv_polisher_screen.dart';
+
 import 'templates_screen.dart';
 import 'my_cvs_screen.dart';
 import 'cover_letter_screen.dart';
@@ -15,7 +15,11 @@ class HomeScreen extends StatelessWidget {
     required String title,
     required String subtitle,
     required Widget screen,
+    Color? color,
   }) {
+    final scheme = Theme.of(context).colorScheme;
+    final iconColor = color ?? scheme.primary;
+
     return Card(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
       elevation: 2,
@@ -33,8 +37,8 @@ class HomeScreen extends StatelessWidget {
             children: [
               CircleAvatar(
                 radius: 26,
-                backgroundColor: Colors.blue.withOpacity(.10),
-                child: Icon(icon, color: Colors.blue, size: 28),
+                backgroundColor: iconColor.withOpacity(.10),
+                child: Icon(icon, color: iconColor, size: 28),
               ),
               const SizedBox(width: 14),
               Expanded(
@@ -128,57 +132,43 @@ class HomeScreen extends StatelessWidget {
                 "Create a new CV, polish your existing one, or explore templates with our tools.",
                 style: TextStyle(fontSize: 14, color: Colors.black87),
               ),
-
               const SizedBox(height: 22),
 
-              // action cards
+              // Action cards
               _buildActionCard(
                 context: context,
-                icon: Icons.description,
+                icon: Icons.description_outlined,
                 title: "Create New CV",
                 subtitle: "Start from a guided form.",
                 screen: const CvFormScreen(),
               ),
               _buildActionCard(
                 context: context,
-                icon: Icons.upload_file,
+                icon: Icons.upload_file_outlined,
                 title: "Polish Existing CV",
                 subtitle: "Upload or paste your CV to refine.",
                 screen: const PolishCVScreen(),
               ),
               _buildActionCard(
                 context: context,
-                icon: Icons.dashboard_customize,
+                icon: Icons.folder_open_outlined,
+                title: "My CVs",
+                subtitle: "View, edit, duplicate, or delete.",
+                screen: const MyCvsScreen(),
+              ),
+              _buildActionCard(
+                context: context,
+                icon: Icons.markunread_mailbox_outlined,
+                title: "Cover Letter",
+                subtitle: "Draft a tailored cover letter.",
+                screen: const CoverLetterScreen(),
+              ),
+              _buildActionCard(
+                context: context,
+                icon: Icons.dashboard_customize_outlined,
                 title: "Explore Templates",
                 subtitle: "Browse CV & cover letter templates.",
                 screen: const TemplatesScreen(),
-              ),
-
-              const SizedBox(height: 20),
-
-              // ✅ Firebase test button
-              Center(
-                child: ElevatedButton.icon(
-                  onPressed: () async {
-                    try {
-                      await FirebaseFirestore.instance.collection("test").add({
-                        "message": "Hello from Flutter!",
-                        "timestamp": DateTime.now(),
-                      });
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text("✅ Test data sent to Firestore!"),
-                        ),
-                      );
-                    } catch (e) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text("❌ Firebase error: $e")),
-                      );
-                    }
-                  },
-                  icon: const Icon(Icons.cloud),
-                  label: const Text("Test Firebase"),
-                ),
               ),
             ],
           ),

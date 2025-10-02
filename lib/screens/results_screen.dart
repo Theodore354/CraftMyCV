@@ -1,9 +1,8 @@
+
 import 'package:cv_helper_app/cv_storage.dart';
 import 'package:cv_helper_app/services/pdf_service.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-
-
 import 'main_screen.dart';
 
 class ResultsScreen extends StatelessWidget {
@@ -16,17 +15,13 @@ class ResultsScreen extends StatelessWidget {
 
     if (!currentList.contains(resultText)) {
       await CvStorage.add(resultText);
-      if (context.mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('CV saved successfully.')));
-      }
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('CV saved successfully.')));
     } else {
-      if (context.mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('CV already saved.')));
-      }
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('CV already saved.')));
     }
   }
 
@@ -36,8 +31,6 @@ class ResultsScreen extends StatelessWidget {
     if (!currentList.contains(resultText)) {
       await CvStorage.add(resultText);
     }
-
-    if (!context.mounted) return;
 
     // Replace stack and show MainScreen with "My CVs" tab selected
     Navigator.of(context).pushAndRemoveUntil(
@@ -54,11 +47,9 @@ class ResultsScreen extends StatelessWidget {
       return;
     }
     await Clipboard.setData(ClipboardData(text: resultText));
-    if (context.mounted) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('Copied to clipboard')));
-    }
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('Copied to clipboard')));
   }
 
   @override
@@ -121,6 +112,14 @@ class ResultsScreen extends StatelessWidget {
           ],
         ),
       ),
+      floatingActionButton:
+          hasText
+              ? FloatingActionButton.extended(
+                onPressed: () => _saveCv(context),
+                icon: const Icon(Icons.bookmark_add_outlined),
+                label: const Text('Save'),
+              )
+              : null,
     );
   }
 }

@@ -21,7 +21,6 @@ class _MainScreenState extends State<MainScreen> {
     _selectedIndex = widget.initialIndex;
   }
 
-  // Screens for each tab
   final List<Widget> _screens = const [
     HomeScreen(),
     MyCvsScreen(),
@@ -29,21 +28,18 @@ class _MainScreenState extends State<MainScreen> {
     ProfileScreen(),
   ];
 
-  void _onItemTapped(int index) {
-    setState(() {
-      _selectedIndex = index;
-    });
-  }
+  void _onItemTapped(int index) => setState(() => _selectedIndex = index);
 
   @override
   Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
     return Scaffold(
       body: _screens[_selectedIndex],
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _selectedIndex,
         onTap: _onItemTapped,
-        selectedItemColor: Colors.blue,
-        unselectedItemColor: Colors.grey,
+        selectedItemColor: scheme.primary,
+        unselectedItemColor: scheme.outline,
         showUnselectedLabels: true,
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.home), label: "Home"),
