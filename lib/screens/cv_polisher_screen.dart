@@ -1,21 +1,38 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:dotted_border/dotted_border.dart';
-import 'results_screen.dart';
+
+import 'package:cv_helper_app/models/index.dart';
+import 'package:cv_helper_app/services/ai_service.dart';
+import 'package:cv_helper_app/screens/review_changes_screen.dart';
+import 'package:cv_helper_app/screens/results_screen.dart';
+import 'package:cv_helper_app/widgets/cv_viewer.dart';
 
 class PolishCVScreen extends StatefulWidget {
   const PolishCVScreen({super.key});
-
   @override
   State<PolishCVScreen> createState() => _PolishCVScreenState();
 }
 
 class _PolishCVScreenState extends State<PolishCVScreen> {
   PlatformFile? _file;
+  File? _pdfLocal;
   bool _picking = false;
+  bool _loading = false;
 
   final _improvementController = TextEditingController();
   final _pasteController = TextEditingController();
+
+  // Polish profile
+  String _role = 'Software Engineer';
+  String _industry = 'General/Tech';
+  String _seniority = 'Mid-level';
+  String _tone = 'Concise & professional';
+  final Set<String> _options = {'ATS_optimize', 'Metrics_focus'};
+
+  // Areas to improve
+  final Set<String> _areas = {'Summary', 'Experience', 'Skills'};
 
   @override
   void dispose() {
@@ -34,7 +51,14 @@ class _PolishCVScreenState extends State<PolishCVScreen> {
         withData: false,
       );
       if (result != null && result.files.isNotEmpty) {
-        setState(() => _file = result.files.single);
+        final f = result.files.single;
+        setState(() {
+          _file = f;
+          _pdfLocal =
+              (f.extension?.toLowerCase() == 'pdf' && f.path != null)
+                  ? File(f.path!)
+                  : null;
+        });
       }
     } catch (e) {
       if (!mounted) return;
@@ -46,7 +70,13 @@ class _PolishCVScreenState extends State<PolishCVScreen> {
     }
   }
 
-  void _removeFile() => setState(() => _file = null);
+  void _removeFile() => setState(() {
+    _file = null;
+    _pdfLocal = null;
+  });
+
+  bool get _hasInput =>
+      _file != null || _pasteController.text.trim().isNotEmpty;
 
   String _fmtBytes(int? bytes) {
     if (bytes == null) return '';
@@ -60,53 +90,94 @@ class _PolishCVScreenState extends State<PolishCVScreen> {
     return '${len.toStringAsFixed(1)} ${sizes[order]}';
   }
 
-  bool get _canPolish =>
-      _file != null || _pasteController.text.trim().isNotEmpty;
+  Widget _optionChip(String key) {
+    final selected = _options.contains(key);
+    return FilterChip(
+      selected: selected,
+      label: Text(key.replaceAll('_', ' ')),
+      onSelected:
+          (_) => setState(() {
+            if (selected)
+              _options.remove(key);
+            else
+              _options.add(key);
+          }),
+    );
+  }
 
-  void _onPolish() {
+  Future<void> _onPolish() async {
     final pasted = _pasteController.text.trim();
     final improve = _improvementController.text.trim();
-
-    if (_file == null && pasted.isEmpty) {
+    if (!_hasInput) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please upload a CV or paste text first')),
       );
       return;
     }
 
-    final srcLabel =
-        _file != null
-            ? 'Uploaded file: ${_file!.name} ${_fmtBytes(_file!.size)}'
-            : 'Pasted text (${pasted.length} chars)';
-
-    final focus =
-        improve.isEmpty
-            ? 'General polish (grammar, clarity, ATS keywords).'
-            : improve;
-
-    final polished = '''
-AI CV Polisher — Preview
-
-Source: $srcLabel
-Requested focus: $focus
-
-What will be improved:
-• Sharpen the professional summary (impact-first).
-• Quantify achievements with metrics where possible.
-• Normalize tense/voice and reduce filler.
-• Fix formatting (dates, bullets, spacing, consistency).
-• Insert role-appropriate ATS keywords.
-
-Sample reworded summary:
-“Results-driven professional with 4+ years’ experience in [domain]. Improved [metric] by [X%] through [action]. Skilled in [tools/skills]. Seeking to drive impact at [target role/company].”
-
-(Placeholder content — connect your AI next.)
-''';
-
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => ResultsScreen(resultText: polished)),
+    final profile = PolishProfile(
+      role: _role,
+      industry: _industry,
+      seniority: _seniority,
+      tone: _tone,
+      options: _options.toList(),
     );
+
+    final rawText =
+        pasted.isNotEmpty ? pasted : '[[PDF content not parsed yet]]';
+
+    setState(() => _loading = true);
+    try {
+      final suggestions = await AiService.draftChanges(
+        rawText: rawText,
+        profile: profile,
+        areas: _areas.toList(),
+        userInstruction: improve.isEmpty ? 'General polish' : improve,
+      );
+      if (!mounted) return;
+
+      // Review screen
+      final accepted = await Navigator.push<List<ChangeSuggestion>>(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ReviewChangesScreen(suggestions: suggestions),
+        ),
+      );
+      if (!mounted || accepted == null) return;
+
+      final summary =
+          StringBuffer()
+            ..writeln('AI CV Polisher — Proposed changes')
+            ..writeln(
+              'Role: ${profile.role} | Industry: ${profile.industry} | ${profile.seniority}',
+            )
+            ..writeln(
+              'Tone: ${profile.tone} | Options: ${profile.options.join(", ")}',
+            )
+            ..writeln('\nAccepted changes:\n');
+
+      for (final c in accepted) {
+        summary
+          ..writeln('— Scope: ${c.scope}')
+          ..writeln('   Before: ${c.before}')
+          ..writeln('   After : ${c.after}')
+          ..writeln('   Why   : ${c.rationale}\n');
+      }
+
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ResultsScreen(resultText: summary.toString()),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Polish failed: $e')));
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
   }
 
   @override
@@ -114,14 +185,7 @@ Sample reworded summary:
     final theme = Theme.of(context);
 
     return Scaffold(
-      appBar: AppBar(
-        title: const Text(
-          'Polish CV',
-          style: TextStyle(fontWeight: FontWeight.bold),
-        ),
-        centerTitle: true,
-        elevation: 0,
-      ),
+      appBar: AppBar(title: const Text('Polish CV'), centerTitle: true),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
@@ -138,7 +202,7 @@ Sample reworded summary:
             ),
             const SizedBox(height: 16),
 
-            // === Dotted Upload Area ===
+            // Dotted uploader
             GestureDetector(
               onTap: _picking ? null : _pickFile,
               child: DottedBorder(
@@ -162,7 +226,6 @@ Sample reworded summary:
                           ? Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
-                              const SizedBox(height: 4),
                               Text(
                                 'Upload CV',
                                 style: theme.textTheme.titleLarge?.copyWith(
@@ -276,7 +339,6 @@ Sample reworded summary:
             ),
             const SizedBox(height: 16),
 
-            // Paste CV text
             const Text(
               'Paste your CV text (optional)',
               style: TextStyle(fontWeight: FontWeight.w700),
@@ -298,10 +360,8 @@ Sample reworded summary:
             ),
 
             const SizedBox(height: 16),
-
-            // Improvement focus
             const Text(
-              'Specify areas for improvement',
+              'Specify areas for improvement (free text)',
               style: TextStyle(fontWeight: FontWeight.w700),
             ),
             const SizedBox(height: 8),
@@ -309,7 +369,8 @@ Sample reworded summary:
               controller: _improvementController,
               maxLines: 3,
               decoration: InputDecoration(
-                hintText: 'e.g., grammar, keywords, conciseness',
+                hintText:
+                    'e.g., tailor to fintech, quantify impact, tighten summary',
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(12),
                 ),
@@ -319,6 +380,155 @@ Sample reworded summary:
             ),
 
             const SizedBox(height: 24),
+            const Text(
+              'Polish profile',
+              style: TextStyle(fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: DropdownButtonFormField<String>(
+                    value: _role,
+                    decoration: const InputDecoration(labelText: 'Target role'),
+                    items:
+                        const [
+                              'Software Engineer',
+                              'Backend Engineer',
+                              'Mobile Developer',
+                              'Data Analyst',
+                              'Product Manager',
+                            ]
+                            .map(
+                              (e) => DropdownMenuItem(value: e, child: Text(e)),
+                            )
+                            .toList(),
+                    onChanged: (v) => setState(() => _role = v ?? _role),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: DropdownButtonFormField<String>(
+                    value: _industry,
+                    decoration: const InputDecoration(labelText: 'Industry'),
+                    items:
+                        const [
+                              'General/Tech',
+                              'FinTech',
+                              'HealthTech',
+                              'E-commerce',
+                              'EdTech',
+                            ]
+                            .map(
+                              (e) => DropdownMenuItem(value: e, child: Text(e)),
+                            )
+                            .toList(),
+                    onChanged:
+                        (v) => setState(() => _industry = v ?? _industry),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: DropdownButtonFormField<String>(
+                    value: _seniority,
+                    decoration: const InputDecoration(labelText: 'Seniority'),
+                    items:
+                        const ['Entry-level', 'Mid-level', 'Senior', 'Lead']
+                            .map(
+                              (e) => DropdownMenuItem(value: e, child: Text(e)),
+                            )
+                            .toList(),
+                    onChanged:
+                        (v) => setState(() => _seniority = v ?? _seniority),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: DropdownButtonFormField<String>(
+                    value: _tone,
+                    decoration: const InputDecoration(labelText: 'Tone'),
+                    items:
+                        const [
+                              'Concise & professional',
+                              'Confident',
+                              'Warm',
+                              'Formal',
+                            ]
+                            .map(
+                              (e) => DropdownMenuItem(value: e, child: Text(e)),
+                            )
+                            .toList(),
+                    onChanged: (v) => setState(() => _tone = v ?? _tone),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _optionChip('ATS_optimize'),
+                _optionChip('Metrics_focus'),
+                _optionChip('Leadership_emphasis'),
+              ],
+            ),
+
+            const SizedBox(height: 20),
+            const Text(
+              'Select areas to improve',
+              style: TextStyle(fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              children:
+                  [
+                    'Summary',
+                    'Experience',
+                    'Education',
+                    'Skills',
+                    'Projects',
+                  ].map((a) {
+                    final selected = _areas.contains(a);
+                    return FilterChip(
+                      selected: selected,
+                      label: Text(a),
+                      onSelected:
+                          (_) => setState(() {
+                            if (selected)
+                              _areas.remove(a);
+                            else
+                              _areas.add(a);
+                          }),
+                    );
+                  }).toList(),
+            ),
+
+            const SizedBox(height: 20),
+            const Text(
+              'Preview',
+              style: TextStyle(fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 8),
+            SizedBox(
+              height: 260,
+              child: Card(
+                clipBehavior: Clip.antiAlias,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: CvViewer(
+                  pdfFile: _pdfLocal,
+                  plainText: _pdfLocal == null ? _pasteController.text : null,
+                ),
+              ),
+            ),
+            const SizedBox(height: 90),
           ],
         ),
       ),
@@ -328,19 +538,15 @@ Sample reworded summary:
           width: double.infinity,
           height: 56,
           child: FilledButton(
-            onPressed: _canPolish ? _onPolish : null,
-            style: FilledButton.styleFrom(
-              backgroundColor: const Color.fromARGB(255, 29, 138, 248),
-              foregroundColor: Colors.white,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(12),
-              ),
-              textStyle: const TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-              ),
-            ),
-            child: const Text('Polish CV'),
+            onPressed: _loading || !_hasInput ? null : _onPolish,
+            child:
+                _loading
+                    ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                    : const Text('Polish CV'),
           ),
         ),
       ),

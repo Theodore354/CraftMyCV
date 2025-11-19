@@ -1,19 +1,33 @@
-// lib/screens/profile_screen.dart
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../cv_storage.dart';
+import 'login_screen.dart'; // ✅ import login screen for navigation
 
 class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
 
   Future<void> _logout(BuildContext context) async {
-    // Clear local cached CVs for privacy
-    await CvStorage.clear();
+    try {
+      // Clear cached CVs for privacy
+      await CvStorage.clear();
 
-    // Sign out from Firebase
-    await FirebaseAuth.instance.signOut();
-    
-    
+      // Sign out user from Firebase
+      await FirebaseAuth.instance.signOut();
+
+      // Navigate to login screen and remove all previous routes
+      if (context.mounted) {
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(builder: (_) => const LoginScreen()),
+          (route) => false,
+        );
+      }
+    } catch (e) {
+      if (context.mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Logout failed: $e')));
+      }
+    }
   }
 
   @override
@@ -21,13 +35,18 @@ class ProfileScreen extends StatelessWidget {
     final user = FirebaseAuth.instance.currentUser;
 
     return Scaffold(
+      appBar: AppBar(
+        title: const Text("Profile"),
+        centerTitle: true,
+        elevation: 0,
+      ),
       body: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(24),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              const SizedBox(height: 30),
+              const SizedBox(height: 40),
 
               // Profile avatar
               CircleAvatar(
@@ -36,12 +55,14 @@ class ProfileScreen extends StatelessWidget {
                 child: const Icon(Icons.person, size: 60, color: Colors.white),
               ),
 
-              const SizedBox(height: 20),
+              const SizedBox(height: 24),
 
-              // User email
+              // Display user email
               Text(
                 user?.email ?? "No email found",
-                style: Theme.of(context).textTheme.titleMedium,
+                style: Theme.of(
+                  context,
+                ).textTheme.titleMedium?.copyWith(fontWeight: FontWeight.w600),
               ),
 
               const SizedBox(height: 40),

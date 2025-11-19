@@ -1,6 +1,8 @@
 import 'package:cv_helper_app/screens/results_screen.dart';
 import 'package:flutter/material.dart';
 
+import 'package:cv_helper_app/services/ai_service.dart';
+
 class CoverLetterScreen extends StatefulWidget {
   const CoverLetterScreen({super.key});
 
@@ -14,6 +16,8 @@ class _CoverLetterScreenState extends State<CoverLetterScreen> {
   final _companyController = TextEditingController();
   final _jobDescriptionController = TextEditingController();
 
+  bool _isLoading = false;
+
   @override
   void dispose() {
     _jobTitleController.dispose();
@@ -22,35 +26,35 @@ class _CoverLetterScreenState extends State<CoverLetterScreen> {
     super.dispose();
   }
 
-  void _generateLetter() {
+  Future<void> _generateLetter() async {
     if (!_formKey.currentState!.validate()) return;
 
     final title = _jobTitleController.text.trim();
     final company = _companyController.text.trim();
     final desc = _jobDescriptionController.text.trim();
 
-    final dummyLetter = """
-Dear Hiring Manager,
+    setState(() => _isLoading = true);
 
-I am excited to apply for the $title role at $company.
-With my background and skills, I believe I am an excellent fit for this opportunity.
+    try {
+      final letter = await AiService.generateCoverLetter(
+        jobTitle: title,
+        company: company,
+        description: desc,
+      );
 
-Job Description Highlights:
-$desc
-
-Thank you for considering my application.
-I look forward to the opportunity to contribute to your team.
-
-Sincerely,
-[Your Name]
-
-(This is a sample letter. Later, AI will generate a polished, tailored version.)
-""";
-
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => ResultsScreen(resultText: dummyLetter)),
-    );
+      if (!mounted) return;
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => ResultsScreen(resultText: letter)),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to generate letter: $e')));
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
   }
 
   InputDecoration _decoration(String label, {String? hint}) {
@@ -110,7 +114,7 @@ Sincerely,
               SizedBox(
                 width: double.infinity,
                 child: FilledButton(
-                  onPressed: _generateLetter,
+                  onPressed: _isLoading ? null : _generateLetter,
                   style: FilledButton.styleFrom(
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(
@@ -123,7 +127,14 @@ Sincerely,
                       fontWeight: FontWeight.w700,
                     ),
                   ),
-                  child: const Text("Generate Cover Letter"),
+                  child:
+                      _isLoading
+                          ? const SizedBox(
+                            width: 20,
+                            height: 20,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                          : const Text("Generate Cover Letter"),
                 ),
               ),
             ],
