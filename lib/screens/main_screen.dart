@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
-import 'home_screen.dart';
-import 'my_cvs_screen.dart';
-import 'templates_screen.dart';
-import 'profile_screen.dart';
+
+import 'package:cv_helper_app/screens/home_screen.dart';
+import 'package:cv_helper_app/screens/my_cvs_screen.dart';
+import 'package:cv_helper_app/screens/templates_screen.dart';
+import 'package:cv_helper_app/screens/profile_screen.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key, this.initialIndex = 0});
@@ -17,7 +18,7 @@ class _MainScreenState extends State<MainScreen> {
   final PageStorageBucket _bucket = PageStorageBucket();
 
   late final List<Widget> _pages = <Widget>[
-    const HomeScreen(key: PageStorageKey('home')),
+    HomeScreen(key: const PageStorageKey('home')),
     const MyCvsScreen(key: PageStorageKey('my_cvs')),
     const TemplatesScreen(key: PageStorageKey('templates')),
     const ProfileScreen(key: PageStorageKey('profile')),

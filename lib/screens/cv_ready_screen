@@ -1,0 +1,214 @@
+import 'package:flutter/material.dart';
+import 'package:printing/printing.dart';
+import 'package:cv_helper_app/models/index.dart';
+import 'package:cv_helper_app/services/pdf_service.dart';
+import 'package:cv_helper_app/screens/my_cvs_screen.dart';
+
+class CvReadyScreen extends StatelessWidget {
+  final CvModel cv;
+  final String templateId;
+  final String templateTitle;
+
+  const CvReadyScreen({
+    super.key,
+    required this.cv,
+    required this.templateId,
+    required this.templateTitle,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text("CV Ready"),
+        centerTitle: true,
+      ),
+      body: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            const SizedBox(height: 8),
+
+            // Big success icon
+            Container(
+              width: 84,
+              height: 84,
+              decoration: BoxDecoration(
+                color: scheme.primary.withOpacity(.12),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.check_circle_outline,
+                size: 58,
+                color: scheme.primary,
+              ),
+            ),
+
+            const SizedBox(height: 14),
+
+            Text(
+              "Your CV is Ready!",
+              style: textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+
+            const SizedBox(height: 4),
+
+            Text(
+              "Template: $templateTitle",
+              style: textTheme.bodyMedium?.copyWith(color: scheme.outline),
+            ),
+
+            const SizedBox(height: 18),
+
+            // Mini preview card (clean + professional)
+            Card(
+              elevation: 0,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(14),
+                side: BorderSide(color: scheme.outlineVariant.withOpacity(.6)),
+              ),
+              child: SizedBox(
+                height: 230,
+                width: double.infinity,
+                child: Padding(
+                  padding: const EdgeInsets.all(12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // fake header bar to suggest template style
+                      Container(
+                        height: 14,
+                        width: 130,
+                        decoration: BoxDecoration(
+                          color: scheme.primary.withOpacity(.9),
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      // some grey lines
+                      ...List.generate(
+                        7,
+                        (i) => Padding(
+                          padding: const EdgeInsets.only(bottom: 7),
+                          child: Container(
+                            height: 7,
+                            width: i.isEven ? 210 : 160,
+                            decoration: BoxDecoration(
+                              color: Colors.black12,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                          ),
+                        ),
+                      ),
+                      const Spacer(),
+                      Align(
+                        alignment: Alignment.bottomRight,
+                        child: Text(
+                          cv.fullName.isEmpty ? "Untitled CV" : cv.fullName,
+                          style: textTheme.bodySmall?.copyWith(
+                            color: scheme.outline,
+                          ),
+                        ),
+                      )
+                    ],
+                  ),
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 18),
+
+            // Action buttons
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton.icon(
+                    icon: const Icon(Icons.visibility_outlined),
+                    label: const Text("View PDF"),
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    onPressed: () {
+                      PdfService.previewPdfFromCv(
+                        cv,
+                        templateId: templateId,
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: FilledButton.icon(
+                    icon: const Icon(Icons.share_outlined),
+                    label: const Text("Share PDF"),
+                    style: FilledButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                    onPressed: () async {
+                      final pdfData = await PdfService.generatePdfFromCv(
+                        cv,
+                        templateId: templateId,
+                      );
+                      await Printing.sharePdf(
+                        bytes: pdfData,
+                        filename:
+                            "${cv.fullName.isEmpty ? "cv" : cv.fullName}_$templateId.pdf",
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+
+            const SizedBox(height: 12),
+
+            SizedBox(
+              width: double.infinity,
+              height: 54,
+              child: FilledButton(
+                style: FilledButton.styleFrom(
+                  backgroundColor: scheme.primary,
+                  foregroundColor: scheme.onPrimary,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+                onPressed: () {
+                  Navigator.pushAndRemoveUntil(
+                    context,
+                    MaterialPageRoute(builder: (_) => const MyCvsScreen()),
+                    (r) => r.isFirst,
+                  );
+                },
+                child: const Text(
+                  "Go to My CVs",
+                  style: TextStyle(fontWeight: FontWeight.w800),
+                ),
+              ),
+            ),
+
+            const SizedBox(height: 8),
+
+            TextButton(
+              onPressed: () {
+                Navigator.popUntil(context, (r) => r.isFirst);
+              },
+              child: const Text("Back to Home"),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}

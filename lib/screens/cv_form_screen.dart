@@ -1,8 +1,11 @@
+import 'package:cv_helper_app/screens/cv_ready_screen';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cv_helper_app/models/index.dart';
 import 'package:cv_helper_app/services/firestore_service.dart';
 import 'package:cv_helper_app/screens/cv_preview_screen.dart';
+
 
 class CvFormScreen extends StatefulWidget {
   final CvModel? initial;
@@ -48,10 +51,22 @@ class _CvFormScreenState extends State<CvFormScreen> {
   }
 
   // ======= SAVE / PREVIEW =======
-  Future<void> _saveCv(CvModel cv) async {
+  Future<String?> _saveCv(CvModel cv, {String? templateId}) async {
     final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
-    await FirestoreService.upsertCv(user.uid, cv);
+    if (user == null) return null;
+
+    final cvId = await FirestoreService.upsertCv(user.uid, cv);
+
+    if (templateId != null && templateId.isNotEmpty) {
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(user.uid)
+          .collection('cvs')
+          .doc(cvId)
+          .set({"templateId": templateId}, SetOptions(merge: true));
+    }
+
+    return cvId;
   }
 
   Future<void> _previewAndSave() async {
@@ -69,18 +84,35 @@ class _CvFormScreenState extends State<CvFormScreen> {
       skills: skills,
     );
 
-    final confirmed = await Navigator.push<bool>(
+    final confirmed = await Navigator.push<dynamic>(
       context,
       MaterialPageRoute(builder: (_) => CvPreviewScreen(cv: cv)),
     );
 
-    if (confirmed == true) {
-      await _saveCv(cv);
+    String templateId = "default";
+    String templateTitle = "Default Template";
+
+    if (confirmed is Map) {
+      templateId = confirmed["templateId"]?.toString() ?? "default";
+      templateTitle = confirmed["title"]?.toString() ?? "Default Template";
+    }
+
+    if (confirmed == true || confirmed is Map) {
+      await _saveCv(cv, templateId: templateId);
       if (!mounted) return;
-      ScaffoldMessenger.of(
+
+      // Go to final success screen (premium finish)
+      Navigator.pushReplacement(
         context,
-      ).showSnackBar(const SnackBar(content: Text('CV saved successfully!')));
-      Navigator.pop(context, true);
+        MaterialPageRoute(
+          builder:
+              (_) => CvReadyScreen(
+                cv: cv,
+                templateId: templateId,
+                templateTitle: templateTitle,
+              ),
+        ),
+      );
     }
   }
 
@@ -162,7 +194,7 @@ class _CvFormScreenState extends State<CvFormScreen> {
             ),
             actions: [
               TextButton(
-                onPressed: () => Navigator.pop(ctx),
+                onPressed: () => Navigator.pop(ctx, false),
                 child: const Text('Cancel'),
               ),
               FilledButton(
@@ -264,7 +296,7 @@ class _CvFormScreenState extends State<CvFormScreen> {
             ),
             actions: [
               TextButton(
-                onPressed: () => Navigator.pop(ctx),
+                onPressed: () => Navigator.pop(ctx, false),
                 child: const Text('Cancel'),
               ),
               FilledButton(
@@ -360,7 +392,7 @@ class _CvFormScreenState extends State<CvFormScreen> {
             style: OutlinedButton.styleFrom(
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(10),
-              ), // rectangular
+              ),
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
             ),
           ),
@@ -722,9 +754,7 @@ class _IconBubble extends StatelessWidget {
           ),
         ],
       ),
-      child: Center(
-        child: Icon(icon, color: Colors.white, size: 18),
-      ), // show the actual icon
+      child: Center(child: Icon(icon, color: Colors.white, size: 18)),
     );
   }
 }

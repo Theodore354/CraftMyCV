@@ -1,11 +1,11 @@
 import 'dart:typed_data';
-import 'package:pdf/pdf.dart' show PdfColors;
+import 'package:pdf/pdf.dart' show PdfColors, PdfColor;
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 import 'package:cv_helper_app/models/index.dart';
 
 class PdfService {
-  // --- keep your original text-based generator (handy for quick debug) ---
+  
   static Future<Uint8List> generatePdf(String cvText) async {
     final pdf = pw.Document();
     pdf.addPage(
@@ -25,31 +25,235 @@ class PdfService {
     await Printing.layoutPdf(onLayout: (_) => pdfData);
   }
 
-  // --- structured PDF from CvModel (clean sections & bullets) ---
-  static Future<Uint8List> generatePdfFromCv(CvModel cv) async {
+  
+
+  static Future<Uint8List> generatePdfFromText(
+    String text, {
+    String templateId = "default",
+    String title = "Polished CV",
+  }) async {
+    final pdf = pw.Document();
+    final style = _textStyle(templateId);
+
+    pdf.addPage(
+      pw.MultiPage(
+        margin: const pw.EdgeInsets.all(24),
+        build:
+            (ctx) => [
+              // header strip
+              pw.Container(
+                padding: const pw.EdgeInsets.all(14),
+                decoration: pw.BoxDecoration(
+                  color: style.bg,
+                  borderRadius: pw.BorderRadius.circular(8),
+                ),
+                child: pw.Row(
+                  children: [
+                    pw.Container(
+                      width: 6,
+                      height: 42,
+                      decoration: pw.BoxDecoration(
+                        color: style.accent,
+                        borderRadius: pw.BorderRadius.circular(999),
+                      ),
+                    ),
+                    pw.SizedBox(width: 10),
+                    pw.Text(
+                      title,
+                      style: pw.TextStyle(
+                        fontSize: 18,
+                        fontWeight: pw.FontWeight.bold,
+                        color: style.textColor,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              pw.SizedBox(height: 12),
+
+              pw.Text(
+                text,
+                style: pw.TextStyle(
+                  fontSize: 12.5,
+                  height: 1.4,
+                  color: PdfColors.black,
+                ),
+              ),
+            ],
+      ),
+    );
+
+    return pdf.save();
+  }
+
+  static Future<void> previewPdfFromText(
+    String text, {
+    String templateId = "default",
+    String title = "Polished CV",
+  }) async {
+    final pdfBytes = await generatePdfFromText(
+      text,
+      templateId: templateId,
+      title: title,
+    );
+    await Printing.layoutPdf(onLayout: (_) => pdfBytes);
+  }
+
+  
+
+  static Future<Uint8List> generatePdfFromCv(
+    CvModel cv, {
+    String templateId = "default",
+  }) async {
     final pdf = pw.Document();
 
-    pw.Widget sectionTitle(String text) => pw.Padding(
-      padding: const pw.EdgeInsets.only(bottom: 6),
-      child: pw.Text(
-        text,
-        style: pw.TextStyle(fontSize: 14, fontWeight: pw.FontWeight.bold),
-      ),
-    );
+    switch (templateId) {
+      case "modern_cv":
+        pdf.addPage(_modernTemplate(cv));
+        break;
+      case "minimal_cv":
+        pdf.addPage(_minimalTemplate(cv));
+        break;
+      default:
+        pdf.addPage(_defaultTemplate(cv));
+        break;
+    }
 
-    pw.Widget bullet(String text) => pw.Padding(
-      padding: const pw.EdgeInsets.only(bottom: 3),
-      child: pw.Row(
-        crossAxisAlignment: pw.CrossAxisAlignment.start,
-        children: [pw.Text('•  '), pw.Expanded(child: pw.Text(text))],
-      ),
-    );
+    return pdf.save();
+  }
 
-    // Header
-    final header = pw.Container(
+  static Future<void> previewPdfFromCv(
+    CvModel cv, {
+    String templateId = "default",
+  }) async {
+    final bytes = await generatePdfFromCv(cv, templateId: templateId);
+    await Printing.layoutPdf(onLayout: (_) => bytes);
+  }
+
+  // ============================================================
+  // ✅ TEMPLATE IMPLEMENTATIONS
+  // ============================================================
+
+  
+  static pw.MultiPage _defaultTemplate(CvModel cv) {
+    return pw.MultiPage(
+      margin: const pw.EdgeInsets.all(24),
+      build:
+          (ctx) => [
+            _headerBlock(
+              cv,
+              bg: PdfColors.grey200,
+              accent: PdfColors.blueGrey900,
+            ),
+            pw.SizedBox(height: 12),
+            _workSection(cv, accent: PdfColors.blueGrey900),
+            _eduSection(cv, accent: PdfColors.blueGrey900),
+            _skillsSection(cv, accent: PdfColors.blueGrey900),
+          ],
+    );
+  }
+
+  /// ✅ MODERN TEMPLATE (best first impression)
+  static pw.MultiPage _modernTemplate(CvModel cv) {
+    const accent = PdfColors.blue800;
+
+    return pw.MultiPage(
+      margin: const pw.EdgeInsets.all(24),
+      build:
+          (ctx) => [
+            
+            pw.Container(
+              padding: const pw.EdgeInsets.all(16),
+              decoration: pw.BoxDecoration(
+                gradient: pw.LinearGradient(
+                  colors: [PdfColors.blue700, PdfColors.blue300],
+                ),
+                borderRadius: pw.BorderRadius.circular(10),
+              ),
+              child: pw.Column(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  pw.Text(
+                    cv.fullName.isEmpty ? "Your Name" : cv.fullName,
+                    style: pw.TextStyle(
+                      fontSize: 22,
+                      fontWeight: pw.FontWeight.bold,
+                      color: PdfColors.white,
+                    ),
+                  ),
+                  pw.SizedBox(height: 6),
+                  pw.Wrap(
+                    spacing: 8,
+                    runSpacing: 4,
+                    children: [
+                      if (cv.email.isNotEmpty)
+                        pw.Text(
+                          cv.email,
+                          style: const pw.TextStyle(color: PdfColors.white),
+                        ),
+                      if (cv.phone.isNotEmpty)
+                        pw.Text(
+                          "• ${cv.phone}",
+                          style: const pw.TextStyle(color: PdfColors.white),
+                        ),
+                      if (cv.location.isNotEmpty)
+                        pw.Text(
+                          "• ${cv.location}",
+                          style: const pw.TextStyle(color: PdfColors.white),
+                        ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+
+            pw.SizedBox(height: 14),
+            _workSection(cv, accent: accent),
+            _eduSection(cv, accent: accent),
+            _skillsSection(cv, accent: accent),
+          ],
+    );
+  }
+
+  /// ✅ MINIMAL TEMPLATE (ATS-friendly + clean)
+  static pw.MultiPage _minimalTemplate(CvModel cv) {
+    return pw.MultiPage(
+      margin: const pw.EdgeInsets.fromLTRB(28, 28, 28, 24),
+      build:
+          (ctx) => [
+            pw.Text(
+              cv.fullName.isEmpty ? "Your Name" : cv.fullName,
+              style: pw.TextStyle(fontSize: 24, fontWeight: pw.FontWeight.bold),
+            ),
+            pw.SizedBox(height: 6),
+            pw.Text(
+              [
+                cv.email,
+                cv.phone,
+                cv.location,
+              ].where((e) => e.trim().isNotEmpty).join(" • "),
+              style: const pw.TextStyle(color: PdfColors.grey700, fontSize: 11),
+            ),
+            pw.SizedBox(height: 14),
+
+            _workSection(cv, accent: PdfColors.black),
+            _eduSection(cv, accent: PdfColors.black),
+            _skillsSection(cv, accent: PdfColors.black),
+          ],
+    );
+  }
+
+  
+  static pw.Widget _headerBlock(
+    CvModel cv, {
+    required PdfColor bg,
+    required PdfColor accent,
+  }) {
+    return pw.Container(
       padding: const pw.EdgeInsets.all(16),
       decoration: pw.BoxDecoration(
-        color: PdfColors.grey200,
+        color: bg,
         borderRadius: pw.BorderRadius.circular(8),
       ),
       child: pw.Column(
@@ -57,7 +261,11 @@ class PdfService {
         children: [
           pw.Text(
             cv.fullName.isEmpty ? 'Your Name' : cv.fullName,
-            style: pw.TextStyle(fontSize: 20, fontWeight: pw.FontWeight.bold),
+            style: pw.TextStyle(
+              fontSize: 20,
+              fontWeight: pw.FontWeight.bold,
+              color: PdfColors.black,
+            ),
           ),
           pw.SizedBox(height: 6),
           pw.Wrap(
@@ -72,130 +280,128 @@ class PdfService {
         ],
       ),
     );
+  }
 
-    // Work Experience
-    final work =
-        cv.workExperience.isEmpty
-            ? pw.SizedBox()
-            : pw.Column(
-              crossAxisAlignment: pw.CrossAxisAlignment.start,
-              children: [
-                sectionTitle('Work Experience'),
-                ...cv.workExperience.map((w) {
-                  final bullets = _splitBullets(w.responsibilities);
-                  return pw.Padding(
-                    padding: const pw.EdgeInsets.only(bottom: 10),
-                    child: pw.Column(
-                      crossAxisAlignment: pw.CrossAxisAlignment.start,
-                      children: [
-                        pw.Text(
-                          '${w.jobTitle} — ${w.company}',
-                          style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
-                        ),
-                        pw.Text(
-                          '${w.start} — ${w.end}',
-                          style: const pw.TextStyle(color: PdfColors.grey700),
-                        ),
-                        if (bullets.isNotEmpty) pw.SizedBox(height: 4),
-                        if (bullets.isNotEmpty) ...bullets.map(bullet),
-                      ],
-                    ),
-                  );
-                }),
-              ],
-            );
-
-    // Education
-    final edu =
-        cv.education.isEmpty
-            ? pw.SizedBox()
-            : pw.Column(
-              crossAxisAlignment: pw.CrossAxisAlignment.start,
-              children: [
-                sectionTitle('Education'),
-                ...cv.education.map((e) {
-                  final bullets = _splitBullets(e.description);
-                  return pw.Padding(
-                    padding: const pw.EdgeInsets.only(bottom: 10),
-                    child: pw.Column(
-                      crossAxisAlignment: pw.CrossAxisAlignment.start,
-                      children: [
-                        pw.Text(
-                          '${e.degree} — ${e.institution}',
-                          style: pw.TextStyle(fontWeight: pw.FontWeight.bold),
-                        ),
-                        pw.Text(
-                          '${e.start} — ${e.end}',
-                          style: const pw.TextStyle(color: PdfColors.grey700),
-                        ),
-                        if (bullets.isNotEmpty) pw.SizedBox(height: 4),
-                        if (bullets.isNotEmpty) ...bullets.map(bullet),
-                      ],
-                    ),
-                  );
-                }),
-              ],
-            );
-
-    // Skills
-    final skills =
-        cv.skills.isEmpty
-            ? pw.SizedBox()
-            : pw.Column(
-              crossAxisAlignment: pw.CrossAxisAlignment.start,
-              children: [
-                sectionTitle('Skills'),
-                pw.Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children:
-                      cv.skills
-                          .map(
-                            (s) => pw.Container(
-                              padding: const pw.EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 4,
-                              ),
-                              decoration: pw.BoxDecoration(
-                                border: pw.Border.all(color: PdfColors.grey400),
-                                borderRadius: pw.BorderRadius.circular(6),
-                              ),
-                              child: pw.Text(s),
-                            ),
-                          )
-                          .toList(),
-                ),
-              ],
-            );
-
-    pdf.addPage(
-      pw.MultiPage(
-        margin: const pw.EdgeInsets.symmetric(horizontal: 24, vertical: 24),
-        build:
-            (ctx) => [
-              header,
-              pw.SizedBox(height: 12),
-              work,
-              if (cv.workExperience.isNotEmpty &&
-                  (cv.education.isNotEmpty || cv.skills.isNotEmpty))
-                pw.SizedBox(height: 12),
-              edu,
-              if (cv.education.isNotEmpty && cv.skills.isNotEmpty)
-                pw.SizedBox(height: 12),
-              skills,
-            ],
+  static pw.Widget _sectionTitle(String text, PdfColor accent) => pw.Padding(
+    padding: const pw.EdgeInsets.only(bottom: 6),
+    child: pw.Text(
+      text,
+      style: pw.TextStyle(
+        fontSize: 14,
+        fontWeight: pw.FontWeight.bold,
+        color: accent,
       ),
+    ),
+  );
+
+  static pw.Widget _bullet(String text) => pw.Padding(
+    padding: const pw.EdgeInsets.only(bottom: 3),
+    child: pw.Row(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [pw.Text('•  '), pw.Expanded(child: pw.Text(text))],
+    ),
+  );
+
+  static pw.Widget _workSection(CvModel cv, {required PdfColor accent}) {
+    if (cv.workExperience.isEmpty) return pw.SizedBox();
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        _sectionTitle('Work Experience', accent),
+        ...cv.workExperience.map((w) {
+          final bullets = _splitBullets(w.responsibilities);
+          return pw.Padding(
+            padding: const pw.EdgeInsets.only(bottom: 10),
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Text(
+                  '${w.jobTitle} — ${w.company}',
+                  style: pw.TextStyle(
+                    fontWeight: pw.FontWeight.bold,
+                    fontSize: 12,
+                  ),
+                ),
+                pw.Text(
+                  '${w.start} — ${w.end}',
+                  style: const pw.TextStyle(color: PdfColors.grey700),
+                ),
+                if (bullets.isNotEmpty) pw.SizedBox(height: 4),
+                if (bullets.isNotEmpty) ...bullets.map(_bullet),
+              ],
+            ),
+          );
+        }),
+        pw.SizedBox(height: 8),
+      ],
     );
-
-    return pdf.save();
   }
 
-  static Future<void> previewPdfFromCv(CvModel cv) async {
-    final pdfData = await generatePdfFromCv(cv);
-    await Printing.layoutPdf(onLayout: (_) => pdfData);
+  static pw.Widget _eduSection(CvModel cv, {required PdfColor accent}) {
+    if (cv.education.isEmpty) return pw.SizedBox();
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        _sectionTitle('Education', accent),
+        ...cv.education.map((e) {
+          final bullets = _splitBullets(e.description);
+          return pw.Padding(
+            padding: const pw.EdgeInsets.only(bottom: 10),
+            child: pw.Column(
+              crossAxisAlignment: pw.CrossAxisAlignment.start,
+              children: [
+                pw.Text(
+                  '${e.degree} — ${e.institution}',
+                  style: pw.TextStyle(
+                    fontWeight: pw.FontWeight.bold,
+                    fontSize: 12,
+                  ),
+                ),
+                pw.Text(
+                  '${e.start} — ${e.end}',
+                  style: const pw.TextStyle(color: PdfColors.grey700),
+                ),
+                if (bullets.isNotEmpty) pw.SizedBox(height: 4),
+                if (bullets.isNotEmpty) ...bullets.map(_bullet),
+              ],
+            ),
+          );
+        }),
+        pw.SizedBox(height: 8),
+      ],
+    );
   }
 
-  // Helpers (same splitting logic as your preview screen)
+  static pw.Widget _skillsSection(CvModel cv, {required PdfColor accent}) {
+    if (cv.skills.isEmpty) return pw.SizedBox();
+    return pw.Column(
+      crossAxisAlignment: pw.CrossAxisAlignment.start,
+      children: [
+        _sectionTitle('Skills', accent),
+        pw.Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children:
+              cv.skills
+                  .map(
+                    (s) => pw.Container(
+                      padding: const pw.EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: pw.BoxDecoration(
+                        border: pw.Border.all(color: PdfColors.grey400),
+                        borderRadius: pw.BorderRadius.circular(6),
+                      ),
+                      child: pw.Text(s),
+                    ),
+                  )
+                  .toList(),
+        ),
+      ],
+    );
+  }
+
   static List<String> _splitBullets(String? text) {
     if (text == null) return const [];
     final raw = text.trim();
@@ -206,4 +412,42 @@ class PdfService {
         .where((e) => e.isNotEmpty)
         .toList();
   }
+
+  // ============================================================
+  // Text template styles for polished CV PDFs
+  // ============================================================
+
+  static _TextStylePack _textStyle(String templateId) {
+    switch (templateId) {
+      case "modern_cv":
+        return const _TextStylePack(
+          accent: PdfColors.blue800,
+          bg: PdfColors.blue50,
+          textColor: PdfColors.blue900,
+        );
+      case "minimal_cv":
+        return const _TextStylePack(
+          accent: PdfColors.black,
+          bg: PdfColors.grey100,
+          textColor: PdfColors.black,
+        );
+      default:
+        return const _TextStylePack(
+          accent: PdfColors.blueGrey900,
+          bg: PdfColors.grey200,
+          textColor: PdfColors.black,
+        );
+    }
+  }
+}
+
+class _TextStylePack {
+  final PdfColor accent;
+  final PdfColor bg;
+  final PdfColor textColor;
+  const _TextStylePack({
+    required this.accent,
+    required this.bg,
+    required this.textColor,
+  });
 }

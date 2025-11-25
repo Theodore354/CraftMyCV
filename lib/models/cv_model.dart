@@ -13,6 +13,9 @@ class CvModel {
   final List<EducationEntry> education;
   final List<String> skills;
 
+  // ✅ NEW: templateId saved from templates flow
+  final String templateId;
+
   const CvModel({
     this.id = '',
     required this.fullName,
@@ -22,6 +25,7 @@ class CvModel {
     required this.workExperience,
     required this.education,
     required this.skills,
+    this.templateId = 'default', // safe default
   });
 
   CvModel copyWith({
@@ -33,6 +37,7 @@ class CvModel {
     List<WorkEntry>? workExperience,
     List<EducationEntry>? education,
     List<String>? skills,
+    String? templateId,
   }) {
     return CvModel(
       id: id ?? this.id,
@@ -43,6 +48,7 @@ class CvModel {
       workExperience: workExperience ?? this.workExperience,
       education: education ?? this.education,
       skills: skills ?? this.skills,
+      templateId: templateId ?? this.templateId,
     );
   }
 
@@ -70,12 +76,13 @@ class CvModel {
           (map['skills'] as List<dynamic>? ?? [])
               .map((e) => e.toString())
               .toList(),
+
+      // ✅ NEW: read templateId from firestore (if missing -> default)
+      templateId: (map['templateId'] ?? 'default').toString(),
     );
   }
 
-  /// Note: timestamps (createdAt/updatedAt) are set by the Firestore service
-  /// using serverTimestamp(). We intentionally omit them here to avoid type
-  /// mismatches.
+  /// Note: timestamps (createdAt/updatedAt) are set by Firestore service
   Map<String, dynamic> toMap() => {
     'fullName': fullName,
     'email': email,
@@ -84,5 +91,8 @@ class CvModel {
     'workExperience': workExperience.map((e) => e.toMap()).toList(),
     'education': education.map((e) => e.toMap()).toList(),
     'skills': skills,
+
+    // ✅ NEW: write templateId
+    'templateId': templateId,
   };
 }

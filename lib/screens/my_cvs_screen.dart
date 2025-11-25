@@ -39,7 +39,7 @@ class _MyCvsScreenState extends State<MyCvsScreen> {
   }
 
   Future<void> _refresh() async {
-    setState(_loadCvs); // re-subscribe (usually instant)
+    setState(_loadCvs);
   }
 
   Future<void> _deleteCv(String cvId, String title) async {
@@ -114,6 +114,7 @@ class _MyCvsScreenState extends State<MyCvsScreen> {
       workExperience: List.from(cv.workExperience),
       education: List.from(cv.education),
       skills: List.from(cv.skills),
+      templateId: cv.templateId, // ✅ keep same template
     );
 
     await FirestoreService.upsertCv(user.uid, dup);
@@ -159,7 +160,6 @@ class _MyCvsScreenState extends State<MyCvsScreen> {
       ),
       body: Column(
         children: [
-          // Search
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
             child: TextField(
@@ -176,7 +176,6 @@ class _MyCvsScreenState extends State<MyCvsScreen> {
           ),
           const SizedBox(height: 8),
 
-          // Live list
           Expanded(
             child: StreamBuilder<List<CvModel>>(
               stream: _streamCvs,
@@ -239,7 +238,7 @@ class _MyCvsScreenState extends State<MyCvsScreen> {
   }
 }
 
-// ===== below: same helper widgets you already have (no changes) =====
+// ===== helper widgets =====
 
 class _CvCard extends StatelessWidget {
   final CvModel cv;
@@ -303,6 +302,8 @@ class _CvCard extends StatelessWidget {
                       spacing: 8,
                       runSpacing: 4,
                       children: [
+                        if (cv.templateId.isNotEmpty)
+                          _TemplateBadge(templateId: cv.templateId),
                         if (cv.location.isNotEmpty)
                           _MiniPill(
                             icon: Icons.location_on_outlined,
@@ -347,6 +348,54 @@ class _CvCard extends StatelessWidget {
     final first = parts.first[0];
     final last = parts.length > 1 ? parts.last[0] : '';
     return (first + last).toUpperCase();
+  }
+}
+
+class _TemplateBadge extends StatelessWidget {
+  final String templateId;
+  const _TemplateBadge({required this.templateId});
+
+  String _prettyName(String id) {
+    switch (id) {
+      case "modern_cv":
+        return "Modern";
+      case "professional_cv":
+        return "Professional";
+      case "creative_cv":
+        return "Creative";
+      case "minimal_cv":
+        return "Minimal";
+      default:
+        return "Default";
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
+      decoration: BoxDecoration(
+        color: scheme.primary.withOpacity(.12),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: scheme.primary.withOpacity(.3)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(Icons.layers_outlined, size: 13, color: scheme.primary),
+          const SizedBox(width: 5),
+          Text(
+            _prettyName(templateId),
+            style: TextStyle(
+              fontSize: 12,
+              color: scheme.primary,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 

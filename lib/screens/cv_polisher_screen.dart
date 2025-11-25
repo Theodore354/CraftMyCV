@@ -97,12 +97,28 @@ class _PolishCVScreenState extends State<PolishCVScreen> {
       label: Text(key.replaceAll('_', ' ')),
       onSelected:
           (_) => setState(() {
-            if (selected)
+            if (selected) {
               _options.remove(key);
-            else
+            } else {
               _options.add(key);
+            }
           }),
     );
+  }
+
+  // ✅ best-effort apply: replace "before" with "after" sequentially
+  String _applyChanges(String raw, List<ChangeSuggestion> accepted) {
+    var text = raw;
+    for (final c in accepted) {
+      final before = c.before.trim();
+      final after = c.after.trim();
+      if (before.isEmpty || after.isEmpty) continue;
+
+      if (text.contains(before)) {
+        text = text.replaceFirst(before, after);
+      }
+    }
+    return text;
   }
 
   Future<void> _onPolish() async {
@@ -136,7 +152,6 @@ class _PolishCVScreenState extends State<PolishCVScreen> {
       );
       if (!mounted) return;
 
-      // Review screen
       final accepted = await Navigator.push<List<ChangeSuggestion>>(
         context,
         MaterialPageRoute(
@@ -144,6 +159,9 @@ class _PolishCVScreenState extends State<PolishCVScreen> {
         ),
       );
       if (!mounted || accepted == null) return;
+
+      // ✅ produce polished full text
+      final polishedText = _applyChanges(rawText, accepted);
 
       final summary =
           StringBuffer()
@@ -167,7 +185,14 @@ class _PolishCVScreenState extends State<PolishCVScreen> {
       Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (_) => ResultsScreen(resultText: summary.toString()),
+          builder:
+              (_) => ResultsScreen(
+                title: "Polished CV",
+                resultText: summary.toString(),
+                polishedText: polishedText,
+                allowTemplateExport:
+                    true, // ✅ THIS enables template export buttons
+              ),
         ),
       );
     } catch (e) {
@@ -202,7 +227,6 @@ class _PolishCVScreenState extends State<PolishCVScreen> {
             ),
             const SizedBox(height: 16),
 
-            // Dotted uploader
             GestureDetector(
               onTap: _picking ? null : _pickFile,
               child: DottedBorder(
@@ -500,10 +524,11 @@ class _PolishCVScreenState extends State<PolishCVScreen> {
                       label: Text(a),
                       onSelected:
                           (_) => setState(() {
-                            if (selected)
+                            if (selected) {
                               _areas.remove(a);
-                            else
+                            } else {
                               _areas.add(a);
+                            }
                           }),
                     );
                   }).toList(),

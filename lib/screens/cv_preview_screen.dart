@@ -1,10 +1,33 @@
 import 'package:flutter/material.dart';
 import 'package:cv_helper_app/models/index.dart';
 import 'package:cv_helper_app/services/pdf_service.dart';
+import 'package:cv_helper_app/screens/templates_screen.dart';
 
 class CvPreviewScreen extends StatelessWidget {
   final CvModel cv;
   const CvPreviewScreen({super.key, required this.cv});
+
+  Future<void> _confirmAndPickTemplate(BuildContext context) async {
+    // Open templates screen and wait for user selection
+    final selected = await Navigator.push<Map<String, dynamic>>(
+      context,
+      MaterialPageRoute(builder: (_) => TemplatesScreen(cv: cv)),
+    );
+
+    if (!context.mounted) return;
+
+    // fallback if user backs out
+    final result =
+        selected ??
+        {
+          "templateId": "default",
+          "category": "cv",
+          "title": "Default Template",
+        };
+
+    // Return Map to previous screen
+    Navigator.of(context).pop(result);
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -22,15 +45,13 @@ class CvPreviewScreen extends StatelessWidget {
           ),
         ],
       ),
-      // Sticky rectangular buttons at the bottom
       bottomNavigationBar: _BottomActions(
         onEdit: () => Navigator.of(context).pop(false),
-        onConfirm: () => Navigator.of(context).pop(true),
+        onConfirm: () => _confirmAndPickTemplate(context),
       ),
       body: ListView(
         padding: EdgeInsets.zero,
         children: [
-          // Header
           Container(
             padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
             decoration: BoxDecoration(
@@ -43,7 +64,6 @@ class CvPreviewScreen extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                // Name + initials avatar
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
@@ -80,7 +100,6 @@ class CvPreviewScreen extends StatelessWidget {
             ),
           ),
 
-          // Body
           Padding(
             padding: const EdgeInsets.all(16),
             child: Column(
@@ -130,9 +149,7 @@ class CvPreviewScreen extends StatelessWidget {
                       ),
                     ),
                   ),
-                const SizedBox(
-                  height: 84,
-                ), // extra space so content isn't hidden behind bottom bar
+                const SizedBox(height: 84),
               ],
             ),
           ),
@@ -142,7 +159,6 @@ class CvPreviewScreen extends StatelessWidget {
   }
 }
 
-/// ===== Bottom action bar with rectangular buttons =====
 class _BottomActions extends StatelessWidget {
   final VoidCallback onEdit;
   final VoidCallback onConfirm;
@@ -208,8 +224,6 @@ class _BottomActions extends StatelessWidget {
     );
   }
 }
-
-/// ===== UI helpers =====
 
 class _Section extends StatelessWidget {
   final String title;
