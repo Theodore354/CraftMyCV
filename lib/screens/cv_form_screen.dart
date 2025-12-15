@@ -556,11 +556,12 @@ class _CvFormScreenState extends State<CvFormScreen> {
               ),
               const SizedBox(height: 6),
               Text(
-                'Fill in the details below. You can add work & education entries and preview before saving.',
+                'Fill in the details below. You can add work & education entries, then preview and enhance your CV with AI before saving.',
                 style: Theme.of(
                   context,
                 ).textTheme.bodySmall?.copyWith(color: Colors.black54),
               ),
+
               const SizedBox(height: 16),
 
               _fieldLabel(context, 'Full Name'),
@@ -721,7 +722,11 @@ class _CvFormScreenState extends State<CvFormScreen> {
 
               const SizedBox(height: 24),
 
-              _GradientButton(text: 'PREVIEW', onPressed: _previewAndSave),
+              _GradientButton(
+                text: 'Preview & Enhance',
+                onPressed: _previewAndSave,
+              ),
+
               const SizedBox(height: 16),
             ],
           ),

@@ -18,7 +18,7 @@ class ResultsScreen extends StatelessWidget {
   /// Optional: show template export buttons when polishedText exists
   final bool allowTemplateExport;
 
-  /// Optional: custom title
+  /// Optional: custom title (shown in AppBar)
   final String title;
 
   const ResultsScreen({
@@ -136,28 +136,41 @@ class ResultsScreen extends StatelessWidget {
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          // ===== Header Card =====
+          // ===== Refined Header Card (no big "Polished CV" text) =====
           Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: scheme.primary.withOpacity(.08),
+              color: scheme.primary.withOpacity(.07),
               borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: scheme.primary.withOpacity(.18)),
+              border: Border.all(color: scheme.primary.withOpacity(.15)),
             ),
             child: Row(
               children: [
                 CircleAvatar(
-                  radius: 18,
-                  backgroundColor: scheme.primary.withOpacity(.15),
+                  radius: 20,
+                  backgroundColor: scheme.primary.withOpacity(.12),
                   child: Icon(Icons.auto_fix_high, color: scheme.primary),
                 ),
-                const SizedBox(width: 10),
+                const SizedBox(width: 12),
                 Expanded(
-                  child: Text(
-                    title,
-                    style: textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.w800,
-                    ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        "All set ✨",
+                        style: textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        "Review the AI result below. You can save, copy, or export it as a PDF.",
+                        style: textTheme.bodySmall?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                          height: 1.35,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
@@ -168,7 +181,10 @@ class ResultsScreen extends StatelessWidget {
 
           // ===== Before vs After =====
           if (showBeforeAfter) ...[
-            _SectionTitle(icon: Icons.compare_arrows, title: "Before vs After"),
+            const _SectionTitle(
+              icon: Icons.compare_arrows,
+              title: "Before vs After",
+            ),
             const SizedBox(height: 8),
 
             _BeforeAfterCard(beforeText: beforeText!, afterText: polishedText!),
@@ -178,9 +194,9 @@ class ResultsScreen extends StatelessWidget {
 
           // ===== Polished / Final CV Text =====
           if (polishedText != null && polishedText!.trim().isNotEmpty) ...[
-            _SectionTitle(
+            const _SectionTitle(
               icon: Icons.check_circle_outline,
-              title: "Polished CV",
+              title: "Polished version",
             ),
             const SizedBox(height: 8),
 
@@ -191,7 +207,10 @@ class ResultsScreen extends StatelessWidget {
 
           // ===== Summary / Generic Result =====
           if (resultText.trim().isNotEmpty) ...[
-            _SectionTitle(icon: Icons.lightbulb_outline, title: "AI Summary"),
+            const _SectionTitle(
+              icon: Icons.lightbulb_outline,
+              title: "AI summary",
+            ),
             const SizedBox(height: 8),
 
             _TextCard(text: resultText, tone: "summary"),
@@ -202,7 +221,7 @@ class ResultsScreen extends StatelessWidget {
               padding: const EdgeInsets.only(top: 24),
               child: Center(
                 child: Text(
-                  "⚠️ No CV generated. Please create one first.",
+                  "⚠️ No result generated. Please try again.",
                   style: textTheme.bodyMedium?.copyWith(color: scheme.outline),
                 ),
               ),
@@ -243,7 +262,7 @@ class ResultsScreen extends StatelessWidget {
                 ],
               ),
 
-              // ✅ Template export for Option B
+              // ✅ Template export for polished CV
               if (allowTemplateExport &&
                   polishedText != null &&
                   polishedText!.trim().isNotEmpty) ...[
@@ -255,7 +274,7 @@ class ResultsScreen extends StatelessWidget {
                     onPressed: () => _exportStyledFromTemplates(context),
                     icon: const Icon(Icons.layers_outlined),
                     label: const Text(
-                      "Choose Template & Export",
+                      "Choose template & export",
                       style: TextStyle(fontWeight: FontWeight.w800),
                     ),
                   ),

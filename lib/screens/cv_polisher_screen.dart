@@ -124,12 +124,17 @@ class _PolishCVScreenState extends State<PolishCVScreen> {
   Future<void> _onPolish() async {
     final pasted = _pasteController.text.trim();
     final improve = _improvementController.text.trim();
+
     if (!_hasInput) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('Please upload a CV or paste text first')),
       );
       return;
     }
+
+    // This is the "before" text we send to AI and show in ResultsScreen
+    final rawText =
+        pasted.isNotEmpty ? pasted : '[[PDF content not parsed yet]]';
 
     final profile = PolishProfile(
       role: _role,
@@ -139,10 +144,8 @@ class _PolishCVScreenState extends State<PolishCVScreen> {
       options: _options.toList(),
     );
 
-    final rawText =
-        pasted.isNotEmpty ? pasted : '[[PDF content not parsed yet]]';
-
     setState(() => _loading = true);
+
     try {
       final suggestions = await AiService.draftChanges(
         rawText: rawText,
@@ -152,6 +155,7 @@ class _PolishCVScreenState extends State<PolishCVScreen> {
       );
       if (!mounted) return;
 
+      // Let user review/accept changes
       final accepted = await Navigator.push<List<ChangeSuggestion>>(
         context,
         MaterialPageRoute(
@@ -160,9 +164,10 @@ class _PolishCVScreenState extends State<PolishCVScreen> {
       );
       if (!mounted || accepted == null) return;
 
-      // ✅ produce polished full text
+      // ✅ Apply only accepted changes
       final polishedText = _applyChanges(rawText, accepted);
 
+      // Build AI summary text
       final summary =
           StringBuffer()
             ..writeln('AI CV Polisher — Proposed changes')
@@ -182,16 +187,17 @@ class _PolishCVScreenState extends State<PolishCVScreen> {
           ..writeln('   Why   : ${c.rationale}\n');
       }
 
+      // ✅ Send both BEFORE + AFTER to ResultsScreen
       Navigator.push(
         context,
         MaterialPageRoute(
           builder:
               (_) => ResultsScreen(
                 title: "Polished CV",
-                resultText: summary.toString(),
+                beforeText: rawText,
                 polishedText: polishedText,
-                allowTemplateExport:
-                    true, // ✅ THIS enables template export buttons
+                resultText: summary.toString(),
+                allowTemplateExport: true,
               ),
         ),
       );
@@ -208,24 +214,52 @@ class _PolishCVScreenState extends State<PolishCVScreen> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final textTheme = theme.textTheme;
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Polish CV'), centerTitle: true),
+      appBar: AppBar(
+        title: const Text('Enhance CV'),
+        centerTitle: false,
+        elevation: 0,
+      ),
       body: SingleChildScrollView(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
+            // ===== Simple header text =====
+            Text(
+              'Enhance your existing CV',
+              style: textTheme.headlineSmall?.copyWith(
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              'Upload your CV or paste the text, then let AI help you clean up the wording and structure.',
+              style: textTheme.bodyMedium?.copyWith(
+                color: scheme.onSurfaceVariant,
+                height: 1.4,
+              ),
+            ),
+            const SizedBox(height: 20),
+
+            // ===== Upload section =====
+            Text(
               'Upload your CV',
-              style: TextStyle(fontSize: 24, fontWeight: FontWeight.w800),
+              style: textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
             ),
-            const SizedBox(height: 8),
-            const Text(
-              'Upload your existing CV in PDF or Word format to get started.',
-              style: TextStyle(fontSize: 16, color: Colors.black54),
+            const SizedBox(height: 4),
+            Text(
+              'PDF or Word (DOC/DOCX) supported.',
+              style: textTheme.bodySmall?.copyWith(
+                color: scheme.onSurfaceVariant,
+              ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
 
             GestureDetector(
               onTap: _picking ? null : _pickFile,
@@ -238,50 +272,57 @@ class _PolishCVScreenState extends State<PolishCVScreen> {
                 child: Container(
                   width: double.infinity,
                   padding: const EdgeInsets.symmetric(
-                    vertical: 36,
+                    vertical: 28,
                     horizontal: 20,
                   ),
                   decoration: BoxDecoration(
                     borderRadius: BorderRadius.circular(16),
-                    color: Colors.white,
+                    color: theme.cardColor,
                   ),
                   child:
                       _file == null
                           ? Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
+                              Icon(
+                                Icons.upload_file_outlined,
+                                size: 32,
+                                color: scheme.primary,
+                              ),
+                              const SizedBox(height: 10),
                               Text(
-                                'Upload CV',
-                                style: theme.textTheme.titleLarge?.copyWith(
-                                  fontWeight: FontWeight.w800,
+                                'Tap to upload your CV',
+                                style: textTheme.titleSmall?.copyWith(
+                                  fontWeight: FontWeight.w700,
                                 ),
                               ),
-                              const SizedBox(height: 8),
+                              const SizedBox(height: 6),
                               Text(
                                 _picking
-                                    ? 'Opening picker…'
-                                    : 'Tap to upload your CV',
-                                style: theme.textTheme.bodyMedium?.copyWith(
-                                  color: Colors.black87,
+                                    ? 'Opening file picker…'
+                                    : 'We’ll keep your file on-device and only send text to AI.',
+                                style: textTheme.bodySmall?.copyWith(
+                                  color: scheme.onSurfaceVariant,
+                                  height: 1.35,
                                 ),
                                 textAlign: TextAlign.center,
                               ),
-                              const SizedBox(height: 20),
+                              const SizedBox(height: 14),
                               ConstrainedBox(
                                 constraints: const BoxConstraints(
-                                  minWidth: 120,
+                                  minWidth: 130,
                                 ),
                                 child: ElevatedButton(
                                   onPressed: _picking ? null : _pickFile,
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.blueGrey.shade50,
-                                    foregroundColor: Colors.black87,
+                                    backgroundColor: scheme.primaryContainer,
+                                    foregroundColor: scheme.onPrimaryContainer,
                                     elevation: 0,
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(12),
                                     ),
                                     padding: const EdgeInsets.symmetric(
-                                      vertical: 12,
+                                      vertical: 10,
                                     ),
                                   ),
                                   child:
@@ -293,13 +334,15 @@ class _PolishCVScreenState extends State<PolishCVScreen> {
                                               strokeWidth: 2,
                                             ),
                                           )
-                                          : const Text('Upload'),
+                                          : const Text('Browse files'),
                                 ),
                               ),
                               const SizedBox(height: 4),
-                              const Text(
+                              Text(
                                 'Accepted: PDF, DOC, DOCX',
-                                style: TextStyle(color: Colors.black54),
+                                style: textTheme.bodySmall?.copyWith(
+                                  color: scheme.onSurfaceVariant,
+                                ),
                               ),
                             ],
                           )
@@ -327,8 +370,9 @@ class _PolishCVScreenState extends State<PolishCVScreen> {
                                     const SizedBox(height: 2),
                                     Text(
                                       _fmtBytes(_file!.size),
-                                      style: const TextStyle(
-                                        color: Colors.black54,
+                                      style: TextStyle(
+                                        color: scheme.onSurfaceVariant,
+                                        fontSize: 12,
                                       ),
                                     ),
                                   ],
@@ -363,9 +407,19 @@ class _PolishCVScreenState extends State<PolishCVScreen> {
             ),
             const SizedBox(height: 16),
 
-            const Text(
+            // ===== Paste text =====
+            Text(
               'Paste your CV text (optional)',
-              style: TextStyle(fontWeight: FontWeight.w700),
+              style: textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'If your file is not supported, just paste the content here.',
+              style: textTheme.bodySmall?.copyWith(
+                color: scheme.onSurfaceVariant,
+              ),
             ),
             const SizedBox(height: 8),
             TextField(
@@ -383,10 +437,19 @@ class _PolishCVScreenState extends State<PolishCVScreen> {
               ),
             ),
 
-            const SizedBox(height: 16),
-            const Text(
-              'Specify areas for improvement (free text)',
-              style: TextStyle(fontWeight: FontWeight.w700),
+            const SizedBox(height: 20),
+            Text(
+              'Tell us what to improve',
+              style: textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Be specific and the AI will focus on those areas first.',
+              style: textTheme.bodySmall?.copyWith(
+                color: scheme.onSurfaceVariant,
+              ),
             ),
             const SizedBox(height: 8),
             TextField(
@@ -404,9 +467,11 @@ class _PolishCVScreenState extends State<PolishCVScreen> {
             ),
 
             const SizedBox(height: 24),
-            const Text(
+            Text(
               'Polish profile',
-              style: TextStyle(fontWeight: FontWeight.w700),
+              style: textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
             ),
             const SizedBox(height: 8),
             Row(
@@ -503,9 +568,11 @@ class _PolishCVScreenState extends State<PolishCVScreen> {
             ),
 
             const SizedBox(height: 20),
-            const Text(
+            Text(
               'Select areas to improve',
-              style: TextStyle(fontWeight: FontWeight.w700),
+              style: textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
             ),
             const SizedBox(height: 8),
             Wrap(
@@ -535,9 +602,11 @@ class _PolishCVScreenState extends State<PolishCVScreen> {
             ),
 
             const SizedBox(height: 20),
-            const Text(
-              'Preview',
-              style: TextStyle(fontWeight: FontWeight.w700),
+            Text(
+              'Live preview',
+              style: textTheme.titleMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+              ),
             ),
             const SizedBox(height: 8),
             SizedBox(
@@ -571,7 +640,7 @@ class _PolishCVScreenState extends State<PolishCVScreen> {
                       height: 20,
                       child: CircularProgressIndicator(strokeWidth: 2),
                     )
-                    : const Text('Polish CV'),
+                    : const Text('Enhance with AI'),
           ),
         ),
       ),

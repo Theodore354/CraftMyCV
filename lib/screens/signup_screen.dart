@@ -28,16 +28,15 @@ class _SignupScreenState extends State<SignupScreen> {
         password: _passwordController.text.trim(),
       );
 
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text("Account created! Please log in.")),
       );
 
-      if (mounted) {
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (_) => const LoginScreen()),
-        );
-      }
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (_) => const LoginScreen()),
+      );
     } on FirebaseAuthException catch (e) {
       String message = "Signup failed.";
       if (e.code == 'email-already-in-use') {
@@ -45,17 +44,20 @@ class _SignupScreenState extends State<SignupScreen> {
       } else if (e.code == 'weak-password') {
         message = "Password must be at least 6 characters.";
       }
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(message)));
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(message)));
+      }
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
     final textTheme = Theme.of(context).textTheme;
+    final scheme = Theme.of(context).colorScheme;
 
     return Scaffold(
       body: SafeArea(
@@ -74,23 +76,27 @@ class _SignupScreenState extends State<SignupScreen> {
                     ),
                   ),
                 ),
+                const SizedBox(height: 8),
+                Center(
+                  child: Text(
+                    "Sign up to save and export your CVs.",
+                    style: textTheme.bodyMedium?.copyWith(
+                      color: scheme.outline,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
                 const SizedBox(height: 32),
 
                 // Email
                 TextFormField(
                   controller: _emailController,
-                  decoration: InputDecoration(
-                    labelText: "Email",
-                    filled: true,
-                    fillColor: Colors.grey.shade100,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide.none,
-                    ),
-                  ),
+                  decoration: const InputDecoration(labelText: "Email"),
                   validator:
                       (value) =>
-                          value!.isEmpty ? "Please enter your email" : null,
+                          (value == null || value.isEmpty)
+                              ? "Please enter your email"
+                              : null,
                 ),
                 const SizedBox(height: 16),
 
@@ -100,12 +106,6 @@ class _SignupScreenState extends State<SignupScreen> {
                   obscureText: _obscurePassword,
                   decoration: InputDecoration(
                     labelText: "Password",
-                    filled: true,
-                    fillColor: Colors.grey.shade100,
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(12),
-                      borderSide: BorderSide.none,
-                    ),
                     suffixIcon: IconButton(
                       icon: Icon(
                         _obscurePassword
@@ -121,7 +121,9 @@ class _SignupScreenState extends State<SignupScreen> {
                   ),
                   validator:
                       (value) =>
-                          value!.length < 6 ? "Password too short" : null,
+                          (value == null || value.length < 6)
+                              ? "Password too short"
+                              : null,
                 ),
                 const SizedBox(height: 20),
 
@@ -131,17 +133,11 @@ class _SignupScreenState extends State<SignupScreen> {
                     : SizedBox(
                       width: double.infinity,
                       height: 50,
-                      child: ElevatedButton(
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.blue,
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
+                      child: FilledButton(
                         onPressed: _signup,
                         child: const Text(
                           "Sign Up",
-                          style: TextStyle(color: Colors.white, fontSize: 16),
+                          style: TextStyle(fontSize: 16),
                         ),
                       ),
                     ),
@@ -161,10 +157,10 @@ class _SignupScreenState extends State<SignupScreen> {
                           ),
                         );
                       },
-                      child: const Text(
+                      child: Text(
                         "Login",
                         style: TextStyle(
-                          color: Colors.blue,
+                          color: scheme.primary,
                           fontWeight: FontWeight.bold,
                         ),
                       ),

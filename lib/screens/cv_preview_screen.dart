@@ -2,10 +2,23 @@ import 'package:flutter/material.dart';
 import 'package:cv_helper_app/models/index.dart';
 import 'package:cv_helper_app/services/pdf_service.dart';
 import 'package:cv_helper_app/screens/templates_screen.dart';
+import 'package:cv_helper_app/services/ai_service.dart';
+import 'package:cv_helper_app/models/polish_profile.dart';
+import 'package:cv_helper_app/screens/results_screen.dart';
+import 'package:cv_helper_app/utils/cv_text_formatter.dart';
 
-class CvPreviewScreen extends StatelessWidget {
+class CvPreviewScreen extends StatefulWidget {
   final CvModel cv;
   const CvPreviewScreen({super.key, required this.cv});
+
+  @override
+  State<CvPreviewScreen> createState() => _CvPreviewScreenState();
+}
+
+class _CvPreviewScreenState extends State<CvPreviewScreen> {
+  bool _enhancing = false;
+
+  CvModel get cv => widget.cv;
 
   Future<void> _confirmAndPickTemplate(BuildContext context) async {
     // Open templates screen and wait for user selection
@@ -29,6 +42,85 @@ class CvPreviewScreen extends StatelessWidget {
     Navigator.of(context).pop(result);
   }
 
+  /// Apply AI suggestions on top of the raw text (simple replaceFirst pass)
+  String _applyChanges(String raw, List changes) {
+    var text = raw;
+    for (final dynamic c in changes) {
+      // AiService already returns List<ChangeSuggestion>,
+      // but we keep it dynamic-safe here.
+      final before = c.before.trim();
+      final after = c.after.trim();
+      if (before.isEmpty || after.isEmpty) continue;
+      if (text.contains(before)) {
+        text = text.replaceFirst(before, after);
+      }
+    }
+    return text;
+  }
+
+  Future<void> _enhanceWithAi() async {
+    if (_enhancing) return;
+
+    final rawText = cvToPlainText(cv);
+    if (rawText.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please fill in your CV details first.')),
+      );
+      return;
+    }
+
+    setState(() => _enhancing = true);
+
+    try {
+      // Basic default profile – later you could let the user tweak this.
+      final profile = PolishProfile(
+        role:
+            cv.workExperience.isNotEmpty
+                ? cv.workExperience.first.jobTitle
+                : 'Graduate',
+        industry: 'General/Tech',
+        seniority: 'Entry-level',
+        tone: 'Concise & professional',
+        options: const ['ATS_optimize', 'Metrics_focus'],
+      );
+
+      final suggestions = await AiService.draftChanges(
+        rawText: rawText,
+        profile: profile,
+        areas: const ['Summary', 'Experience', 'Education', 'Skills'],
+        userInstruction: 'General polish for job applications',
+      );
+
+      if (!mounted) return;
+
+      final polishedText = _applyChanges(rawText, suggestions);
+
+      // Navigate to ResultsScreen with before/after + template export
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder:
+              (_) => ResultsScreen(
+                title: 'AI-Enhanced CV',
+                beforeText: rawText,
+                polishedText: polishedText,
+                resultText:
+                    'Your CV has been polished based on your target role and industry.',
+                allowTemplateExport:
+                    true, // enables "Choose Template & Export" button
+              ),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed to enhance CV: $e')));
+    } finally {
+      if (mounted) setState(() => _enhancing = false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final scheme = Theme.of(context).colorScheme;
@@ -48,10 +140,13 @@ class CvPreviewScreen extends StatelessWidget {
       bottomNavigationBar: _BottomActions(
         onEdit: () => Navigator.of(context).pop(false),
         onConfirm: () => _confirmAndPickTemplate(context),
+        onEnhance: _enhanceWithAi,
+        enhancing: _enhancing,
       ),
       body: ListView(
         padding: EdgeInsets.zero,
         children: [
+          // Header bar
           Container(
             padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
             decoration: BoxDecoration(
@@ -95,6 +190,25 @@ class CvPreviewScreen extends StatelessWidget {
                         text: cv.location,
                       ),
                   ],
+                ),
+              ],
+            ),
+          ),
+
+          // Small hint about AI enhancement
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+            child: Row(
+              children: [
+                Icon(Icons.auto_fix_high, size: 18, color: scheme.primary),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'Review your CV below. You can enhance the wording with AI before choosing a template.',
+                    style: textTheme.bodySmall?.copyWith(
+                      color: scheme.onSurfaceVariant,
+                    ),
+                  ),
                 ),
               ],
             ),
@@ -162,7 +276,15 @@ class CvPreviewScreen extends StatelessWidget {
 class _BottomActions extends StatelessWidget {
   final VoidCallback onEdit;
   final VoidCallback onConfirm;
-  const _BottomActions({required this.onEdit, required this.onConfirm});
+  final VoidCallback onEnhance;
+  final bool enhancing;
+
+  const _BottomActions({
+    required this.onEdit,
+    required this.onConfirm,
+    required this.onEnhance,
+    required this.enhancing,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -185,38 +307,59 @@ class _BottomActions extends StatelessWidget {
             top: BorderSide(color: scheme.outlineVariant.withOpacity(.5)),
           ),
         ),
-        child: Row(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Expanded(
-              child: OutlinedButton(
-                onPressed: onEdit,
-                style: OutlinedButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  side: BorderSide(color: scheme.primary, width: 1),
-                  textStyle: const TextStyle(fontWeight: FontWeight.w700),
-                ),
-                child: const Text('Edit'),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton.icon(
+                onPressed: enhancing ? null : onEnhance,
+                icon:
+                    enhancing
+                        ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                        : const Icon(Icons.auto_fix_high),
+                label: Text(enhancing ? 'Enhancing…' : 'Enhance with AI'),
               ),
             ),
-            const SizedBox(width: 12),
-            Expanded(
-              child: FilledButton(
-                onPressed: onConfirm,
-                style: FilledButton.styleFrom(
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(10),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: onEdit,
+                    style: OutlinedButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      side: BorderSide(color: scheme.primary, width: 1),
+                      textStyle: const TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                    child: const Text('Edit'),
                   ),
-                  backgroundColor: scheme.primary,
-                  foregroundColor: scheme.onPrimary,
-                  elevation: 0,
-                  textStyle: const TextStyle(fontWeight: FontWeight.w800),
                 ),
-                child: const Text('Confirm & Save'),
-              ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: FilledButton(
+                    onPressed: onConfirm,
+                    style: FilledButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      backgroundColor: scheme.primary,
+                      foregroundColor: scheme.onPrimary,
+                      elevation: 0,
+                      textStyle: const TextStyle(fontWeight: FontWeight.w800),
+                    ),
+                    child: const Text('Confirm & Save'),
+                  ),
+                ),
+              ],
             ),
           ],
         ),
