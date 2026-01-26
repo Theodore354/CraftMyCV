@@ -22,7 +22,7 @@ class AiService {
   /// 👉 UPDATE THIS to the real URL shown after:
   ///     firebase deploy --only functions:generateCoverLetter
   static const String _coverLetterEndpoint =
-        'https://generatecoverletter-5el5km2x5q-uc.a.run.app';
+      'https://generatecoverletter-5el5km2x5q-uc.a.run.app';
 
   /// Fetch structured change suggestions from the AI backend.
   ///
@@ -84,6 +84,13 @@ class AiService {
     }
 
     if (resp.statusCode < 200 || resp.statusCode >= 300) {
+      // Check if response is HTML (e.g., Cloud Run 503 error)
+      final contentType = resp.headers['content-type'] ?? '';
+      if (contentType.contains('text/html')) {
+        throw Exception(
+          'AI Service is temporarily unavailable (503). Please try again in a minute.',
+        );
+      }
       // Surface backend errors from the function/OpenAI
       throw Exception('AI service error (${resp.statusCode}): ${resp.body}');
     }

@@ -1,14 +1,14 @@
 import 'dart:typed_data';
-import 'package:pdf/pdf.dart' show PdfColors, PdfColor;
+
+import 'package:cv_helper_app/models/index.dart';
+import 'package:pdf/pdf.dart' as pdf;
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
-import 'package:cv_helper_app/models/index.dart';
 
 class PdfService {
-  
   static Future<Uint8List> generatePdf(String cvText) async {
-    final pdf = pw.Document();
-    pdf.addPage(
+    final doc = pw.Document();
+    doc.addPage(
       pw.Page(
         build:
             (context) => pw.Padding(
@@ -17,26 +17,28 @@ class PdfService {
             ),
       ),
     );
-    return pdf.save();
+    return doc.save();
   }
 
   static Future<void> previewPdf(String cvText) async {
     final pdfData = await generatePdf(cvText);
-    await Printing.layoutPdf(onLayout: (_) => pdfData);
+    await Printing.layoutPdf(
+      onLayout: (_) => pdfData,
+      format: pdf.PdfPageFormat.a4,
+    );
   }
-
-  
 
   static Future<Uint8List> generatePdfFromText(
     String text, {
     String templateId = "default",
     String title = "Polished CV",
   }) async {
-    final pdf = pw.Document();
+    final doc = pw.Document();
     final style = _textStyle(templateId);
 
-    pdf.addPage(
+    doc.addPage(
       pw.MultiPage(
+        pageFormat: pdf.PdfPageFormat.a4,
         margin: const pw.EdgeInsets.all(24),
         build:
             (ctx) => [
@@ -69,22 +71,20 @@ class PdfService {
                   ],
                 ),
               ),
-
               pw.SizedBox(height: 12),
-
               pw.Text(
                 text,
                 style: pw.TextStyle(
                   fontSize: 12.5,
                   height: 1.4,
-                  color: PdfColors.black,
+                  color: pdf.PdfColors.black,
                 ),
               ),
             ],
       ),
     );
 
-    return pdf.save();
+    return doc.save();
   }
 
   static Future<void> previewPdfFromText(
@@ -97,30 +97,31 @@ class PdfService {
       templateId: templateId,
       title: title,
     );
-    await Printing.layoutPdf(onLayout: (_) => pdfBytes);
+    await Printing.layoutPdf(
+      onLayout: (_) => pdfBytes,
+      format: pdf.PdfPageFormat.a4,
+    );
   }
-
-  
 
   static Future<Uint8List> generatePdfFromCv(
     CvModel cv, {
     String templateId = "default",
   }) async {
-    final pdf = pw.Document();
+    final doc = pw.Document();
 
     switch (templateId) {
       case "modern_cv":
-        pdf.addPage(_modernTemplate(cv));
+        doc.addPage(_modernTemplate(cv));
         break;
       case "minimal_cv":
-        pdf.addPage(_minimalTemplate(cv));
+        doc.addPage(_minimalTemplate(cv));
         break;
       default:
-        pdf.addPage(_defaultTemplate(cv));
+        doc.addPage(_defaultTemplate(cv));
         break;
     }
 
-    return pdf.save();
+    return doc.save();
   }
 
   static Future<void> previewPdfFromCv(
@@ -128,46 +129,49 @@ class PdfService {
     String templateId = "default",
   }) async {
     final bytes = await generatePdfFromCv(cv, templateId: templateId);
-    await Printing.layoutPdf(onLayout: (_) => bytes);
+    await Printing.layoutPdf(
+      onLayout: (_) => bytes,
+      format: pdf.PdfPageFormat.a4,
+    );
   }
 
   // ============================================================
   // ✅ TEMPLATE IMPLEMENTATIONS
   // ============================================================
 
-  
   static pw.MultiPage _defaultTemplate(CvModel cv) {
     return pw.MultiPage(
+      pageFormat: pdf.PdfPageFormat.a4,
       margin: const pw.EdgeInsets.all(24),
       build:
           (ctx) => [
             _headerBlock(
               cv,
-              bg: PdfColors.grey200,
-              accent: PdfColors.blueGrey900,
+              bg: pdf.PdfColors.grey200,
+              accent: pdf.PdfColors.blueGrey900,
             ),
             pw.SizedBox(height: 12),
-            _workSection(cv, accent: PdfColors.blueGrey900),
-            _eduSection(cv, accent: PdfColors.blueGrey900),
-            _skillsSection(cv, accent: PdfColors.blueGrey900),
+            _workSection(cv, accent: pdf.PdfColors.blueGrey900),
+            _eduSection(cv, accent: pdf.PdfColors.blueGrey900),
+            _skillsSection(cv, accent: pdf.PdfColors.blueGrey900),
           ],
     );
   }
 
   /// ✅ MODERN TEMPLATE (best first impression)
   static pw.MultiPage _modernTemplate(CvModel cv) {
-    const accent = PdfColors.blue800;
+    const accent = pdf.PdfColors.blue800;
 
     return pw.MultiPage(
+      pageFormat: pdf.PdfPageFormat.a4,
       margin: const pw.EdgeInsets.all(24),
       build:
           (ctx) => [
-            
             pw.Container(
               padding: const pw.EdgeInsets.all(16),
               decoration: pw.BoxDecoration(
                 gradient: pw.LinearGradient(
-                  colors: [PdfColors.blue700, PdfColors.blue300],
+                  colors: [pdf.PdfColors.blue700, pdf.PdfColors.blue300],
                 ),
                 borderRadius: pw.BorderRadius.circular(10),
               ),
@@ -179,7 +183,7 @@ class PdfService {
                     style: pw.TextStyle(
                       fontSize: 22,
                       fontWeight: pw.FontWeight.bold,
-                      color: PdfColors.white,
+                      color: pdf.PdfColors.white,
                     ),
                   ),
                   pw.SizedBox(height: 6),
@@ -190,24 +194,23 @@ class PdfService {
                       if (cv.email.isNotEmpty)
                         pw.Text(
                           cv.email,
-                          style: const pw.TextStyle(color: PdfColors.white),
+                          style: const pw.TextStyle(color: pdf.PdfColors.white),
                         ),
                       if (cv.phone.isNotEmpty)
                         pw.Text(
                           "• ${cv.phone}",
-                          style: const pw.TextStyle(color: PdfColors.white),
+                          style: const pw.TextStyle(color: pdf.PdfColors.white),
                         ),
                       if (cv.location.isNotEmpty)
                         pw.Text(
                           "• ${cv.location}",
-                          style: const pw.TextStyle(color: PdfColors.white),
+                          style: const pw.TextStyle(color: pdf.PdfColors.white),
                         ),
                     ],
                   ),
                 ],
               ),
             ),
-
             pw.SizedBox(height: 14),
             _workSection(cv, accent: accent),
             _eduSection(cv, accent: accent),
@@ -219,6 +222,7 @@ class PdfService {
   /// ✅ MINIMAL TEMPLATE (ATS-friendly + clean)
   static pw.MultiPage _minimalTemplate(CvModel cv) {
     return pw.MultiPage(
+      pageFormat: pdf.PdfPageFormat.a4,
       margin: const pw.EdgeInsets.fromLTRB(28, 28, 28, 24),
       build:
           (ctx) => [
@@ -233,22 +237,23 @@ class PdfService {
                 cv.phone,
                 cv.location,
               ].where((e) => e.trim().isNotEmpty).join(" • "),
-              style: const pw.TextStyle(color: PdfColors.grey700, fontSize: 11),
+              style: const pw.TextStyle(
+                color: pdf.PdfColors.grey700,
+                fontSize: 11,
+              ),
             ),
             pw.SizedBox(height: 14),
-
-            _workSection(cv, accent: PdfColors.black),
-            _eduSection(cv, accent: PdfColors.black),
-            _skillsSection(cv, accent: PdfColors.black),
+            _workSection(cv, accent: pdf.PdfColors.black),
+            _eduSection(cv, accent: pdf.PdfColors.black),
+            _skillsSection(cv, accent: pdf.PdfColors.black),
           ],
     );
   }
 
-  
   static pw.Widget _headerBlock(
     CvModel cv, {
-    required PdfColor bg,
-    required PdfColor accent,
+    required pdf.PdfColor bg,
+    required pdf.PdfColor accent,
   }) {
     return pw.Container(
       padding: const pw.EdgeInsets.all(16),
@@ -264,7 +269,7 @@ class PdfService {
             style: pw.TextStyle(
               fontSize: 20,
               fontWeight: pw.FontWeight.bold,
-              color: PdfColors.black,
+              color: pdf.PdfColors.black,
             ),
           ),
           pw.SizedBox(height: 6),
@@ -282,17 +287,18 @@ class PdfService {
     );
   }
 
-  static pw.Widget _sectionTitle(String text, PdfColor accent) => pw.Padding(
-    padding: const pw.EdgeInsets.only(bottom: 6),
-    child: pw.Text(
-      text,
-      style: pw.TextStyle(
-        fontSize: 14,
-        fontWeight: pw.FontWeight.bold,
-        color: accent,
-      ),
-    ),
-  );
+  static pw.Widget _sectionTitle(String text, pdf.PdfColor accent) =>
+      pw.Padding(
+        padding: const pw.EdgeInsets.only(bottom: 6),
+        child: pw.Text(
+          text,
+          style: pw.TextStyle(
+            fontSize: 14,
+            fontWeight: pw.FontWeight.bold,
+            color: accent,
+          ),
+        ),
+      );
 
   static pw.Widget _bullet(String text) => pw.Padding(
     padding: const pw.EdgeInsets.only(bottom: 3),
@@ -302,7 +308,7 @@ class PdfService {
     ),
   );
 
-  static pw.Widget _workSection(CvModel cv, {required PdfColor accent}) {
+  static pw.Widget _workSection(CvModel cv, {required pdf.PdfColor accent}) {
     if (cv.workExperience.isEmpty) return pw.SizedBox();
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.start,
@@ -324,7 +330,7 @@ class PdfService {
                 ),
                 pw.Text(
                   '${w.start} — ${w.end}',
-                  style: const pw.TextStyle(color: PdfColors.grey700),
+                  style: const pw.TextStyle(color: pdf.PdfColors.grey700),
                 ),
                 if (bullets.isNotEmpty) pw.SizedBox(height: 4),
                 if (bullets.isNotEmpty) ...bullets.map(_bullet),
@@ -337,7 +343,7 @@ class PdfService {
     );
   }
 
-  static pw.Widget _eduSection(CvModel cv, {required PdfColor accent}) {
+  static pw.Widget _eduSection(CvModel cv, {required pdf.PdfColor accent}) {
     if (cv.education.isEmpty) return pw.SizedBox();
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.start,
@@ -359,7 +365,7 @@ class PdfService {
                 ),
                 pw.Text(
                   '${e.start} — ${e.end}',
-                  style: const pw.TextStyle(color: PdfColors.grey700),
+                  style: const pw.TextStyle(color: pdf.PdfColors.grey700),
                 ),
                 if (bullets.isNotEmpty) pw.SizedBox(height: 4),
                 if (bullets.isNotEmpty) ...bullets.map(_bullet),
@@ -372,7 +378,7 @@ class PdfService {
     );
   }
 
-  static pw.Widget _skillsSection(CvModel cv, {required PdfColor accent}) {
+  static pw.Widget _skillsSection(CvModel cv, {required pdf.PdfColor accent}) {
     if (cv.skills.isEmpty) return pw.SizedBox();
     return pw.Column(
       crossAxisAlignment: pw.CrossAxisAlignment.start,
@@ -390,7 +396,7 @@ class PdfService {
                         vertical: 4,
                       ),
                       decoration: pw.BoxDecoration(
-                        border: pw.Border.all(color: PdfColors.grey400),
+                        border: pw.Border.all(color: pdf.PdfColors.grey400),
                         borderRadius: pw.BorderRadius.circular(6),
                       ),
                       child: pw.Text(s),
@@ -421,30 +427,31 @@ class PdfService {
     switch (templateId) {
       case "modern_cv":
         return const _TextStylePack(
-          accent: PdfColors.blue800,
-          bg: PdfColors.blue50,
-          textColor: PdfColors.blue900,
+          accent: pdf.PdfColors.blue800,
+          bg: pdf.PdfColors.blue50,
+          textColor: pdf.PdfColors.blue900,
         );
       case "minimal_cv":
         return const _TextStylePack(
-          accent: PdfColors.black,
-          bg: PdfColors.grey100,
-          textColor: PdfColors.black,
+          accent: pdf.PdfColors.black,
+          bg: pdf.PdfColors.grey100,
+          textColor: pdf.PdfColors.black,
         );
       default:
         return const _TextStylePack(
-          accent: PdfColors.blueGrey900,
-          bg: PdfColors.grey200,
-          textColor: PdfColors.black,
+          accent: pdf.PdfColors.blueGrey900,
+          bg: pdf.PdfColors.grey200,
+          textColor: pdf.PdfColors.black,
         );
     }
   }
 }
 
 class _TextStylePack {
-  final PdfColor accent;
-  final PdfColor bg;
-  final PdfColor textColor;
+  final pdf.PdfColor accent;
+  final pdf.PdfColor bg;
+  final pdf.PdfColor textColor;
+
   const _TextStylePack({
     required this.accent,
     required this.bg,
