@@ -5,7 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:cv_helper_app/models/index.dart';
 import 'package:cv_helper_app/services/firestore_service.dart';
 import 'package:cv_helper_app/screens/cv_preview_screen.dart';
-
+import 'package:cv_helper_app/utils/date_validator.dart';
 
 class CvFormScreen extends StatefulWidget {
   final CvModel? initial;
@@ -164,11 +164,7 @@ class _CvFormScreenState extends State<CvFormScreen> {
                       decoration: const InputDecoration(
                         labelText: 'Start (e.g., Jan 2020) *',
                       ),
-                      validator:
-                          (v) =>
-                              (v == null || v.trim().isEmpty)
-                                  ? 'Required'
-                                  : null,
+                      validator: (v) => DateValidator.validateDate(v),
                     ),
                     TextFormField(
                       controller: endCtl,
@@ -177,9 +173,7 @@ class _CvFormScreenState extends State<CvFormScreen> {
                       ),
                       validator:
                           (v) =>
-                              (v == null || v.trim().isEmpty)
-                                  ? 'Required'
-                                  : null,
+                              DateValidator.validateDateRange(startCtl.text, v),
                     ),
                     TextFormField(
                       controller: respCtl,
@@ -266,11 +260,7 @@ class _CvFormScreenState extends State<CvFormScreen> {
                       decoration: const InputDecoration(
                         labelText: 'Start (e.g., Jan 2018) *',
                       ),
-                      validator:
-                          (v) =>
-                              (v == null || v.trim().isEmpty)
-                                  ? 'Required'
-                                  : null,
+                      validator: (v) => DateValidator.validateDate(v),
                     ),
                     TextFormField(
                       controller: endCtl,
@@ -279,9 +269,7 @@ class _CvFormScreenState extends State<CvFormScreen> {
                       ),
                       validator:
                           (v) =>
-                              (v == null || v.trim().isEmpty)
-                                  ? 'Required'
-                                  : null,
+                              DateValidator.validateDateRange(startCtl.text, v),
                     ),
                     TextFormField(
                       controller: descCtl,
@@ -437,8 +425,9 @@ class _CvFormScreenState extends State<CvFormScreen> {
                 icon: const Icon(Icons.edit_outlined),
                 onPressed: () async {
                   final edited = await _showWorkEntryDialog(initial: w);
-                  if (edited != null)
+                  if (edited != null) {
                     setState(() => workExperience[i] = edited);
+                  }
                 },
               ),
               IconButton(
